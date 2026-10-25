@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RaphaelConfig",
+  "$defs": {
+    "ASRConfig": {
+      "properties": {
+        "provider": {
+          "default": "deepgram",
+          "enum": [
+            "deepgram",
+            "sarvam"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "endpoint_ms": {
+          "default": 500,
+          "maximum": 1500,
+          "minimum": 200,
+          "title": "Endpoint Ms",
+          "type": "integer"
+        }
+      },
+      "title": "ASRConfig",
+      "type": "object"
+    },
+    "AssistantConfig": {
+      "properties": {
+        "persona": {
+          "default": "You are Raphael, a calm, precise advisor speaking privately into the user's earpiece. Answer in at most two short spoken sentences. No lists or formatting. Say numbers as they are spoken. If you don't know, say so in a few words.",
+          "title": "Persona",
+          "type": "string"
+        },
+        "max_sentences": {
+          "default": 2,
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Max Sentences",
+          "type": "integer"
+        },
+        "language": {
+          "default": "en-IN",
+          "enum": [
+            "en-IN",
+            "hi-en"
+          ],
+          "title": "Language",
+          "type": "string"
+        },
+        "llm": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Llm"
+        },
+        "voice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Voice"
+        }
+      },
+      "title": "AssistantConfig",
+      "type": "object"
+    },
+    "DeviceConfig": {
+      "properties": {
+        "headset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Headset Id"
+        },
+        "mic_source": {
+          "default": "headset",
+          "enum": [
+            "headset",
+            "phone"
+          ],
+          "title": "Mic Source",
+          "type": "string"
+        }
+      },
+      "title": "DeviceConfig",
+      "type": "object"
+    },
+    "PrivacyConfig": {
+      "properties": {
+        "store_transcripts": {
+          "default": false,
+          "title": "Store Transcripts",
+          "type": "boolean"
+        }
+      },
+      "title": "PrivacyConfig",
+      "type": "object"
+    },
+    "WakeConfig": {
+      "properties": {
+        "phrases": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Phrases",
+          "type": "array"
+        },
+        "sensitivity": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Sensitivity",
+          "type": "number"
+        },
+        "tap_trigger": {
+          "default": true,
+          "title": "Tap Trigger",
+          "type": "boolean"
+        },
+        "follow_up_window_s": {
+          "default": 5,
+          "maximum": 15,
+          "minimum": 0,
+          "title": "Follow Up Window S",
+          "type": "integer"
+        }
+      },
+      "title": "WakeConfig",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "device": {
+      "$ref": "#/$defs/DeviceConfig"
+    },
+    "wake": {
+      "$ref": "#/$defs/WakeConfig"
+    },
+    "assistant": {
+      "$ref": "#/$defs/AssistantConfig"
+    },
+    "asr": {
+      "$ref": "#/$defs/ASRConfig"
+    },
+    "privacy": {
+      "$ref": "#/$defs/PrivacyConfig"
+    }
+  },
+  "type": "object"
+}
