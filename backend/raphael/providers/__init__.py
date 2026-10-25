@@ -28,6 +28,9 @@ class Providers:
         if config.asr.provider == "sarvam":
             log.warning("Sarvam ASR not wired up yet; using Deepgram")
         keyterms = [k.strip() for k in self.settings.deepgram_keyterms.split(",") if k.strip()]
+        # Bias Deepgram toward the wake phrase words so "Raphael" isn't heard as "rifle".
+        for phrase in config.wake.phrases:
+            keyterms += [w for w in phrase.split() if len(w) >= 4 and w.lower() not in (k.lower() for k in keyterms)]
         return DeepgramASR(self.settings.deepgram_api_key or "", self.settings.deepgram_model, keyterms)
 
     def llm(self, config: RaphaelConfig) -> LLMProvider:

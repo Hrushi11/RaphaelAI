@@ -23,10 +23,10 @@ Read it before making design decisions. If something we decide changes the desig
 - **v0 scope:** client app + voice pipeline + changeable wake word. Out of scope: context ingestion, memory, passive whisper mode, Bolna calls, iOS.
 - **App:** native Android, Kotlin + Jetpack Compose (Material 3 defaults, no custom design). Min SDK 31. Reason: Bluetooth routing, foreground mic service, low-latency audio and sherpa-onnx are all native; a cross-platform framework would add bridge code without saving work.
 - **Phone is the hub.** Headset = mic + speaker only. Phone runs VAD + wake word on-device; backend does STT/LLM/TTS.
-- **Wake word:** sherpa-onnx open-vocabulary keyword spotting (phrase changeable without retraining). Porcupine is the fallback. Earbud tap via `MediaSession` is a second trigger.
+- **Wake word (revised Oct 25):** on-device Silero VAD gates the mic; speech bursts go to the backend, which checks the Deepgram transcript for the wake phrase by sound (`backend/raphael/wakeword.py`) and drops the turn (`no_wake`) otherwise. On-device KWS (sherpa) and on-device Whisper failed on the developer's real voice; Picovoice needs a company email. Earbud tap via `MediaSession` is a second trigger.
 - **Backend:** Python 3.11 + FastAPI, one WebSocket `/v1/session`, JSON control frames + binary 16 kHz mono PCM16 frames (20 ms / 640 bytes). Providers behind `ASRProvider` / `LLMProvider` / `TTSProvider` interfaces.
 - **Providers:** Deepgram (STT, primary), Sarvam Saaras `codemix` (Hinglish alt), OpenAI `gpt-4.1-mini` (LLM, chosen by benchmark Oct 25; Claude kept as `LLM_PROVIDER=anthropic`), Cartesia (TTS). Bolna has no standalone TTS/STT API; it's an agent/phone-call platform — candidate use is a follow-up-call feature (pending user decision).
-- **Privacy:** no audio leaves the phone before a trigger; backend stores no audio.
+- **Privacy (revised Oct 25):** silence never leaves the phone; speech is sent only for the wake check and is discarded (not logged/stored) without the wake phrase. Backend stores no audio.
 
 ## How to work with me
 
@@ -43,7 +43,8 @@ Read it before making design decisions. If something we decide changes the desig
 - **The repo path contains a space** (`Raphael AI`). Gradle / Android NDK / shell scripts can break on this. Resolved: symlink `~/raphael` → repo. Always open/build the Android project via `~/raphael/app-android`.
 - Android toolchain (from Android Studio 2026.2): AGP 9.4.1 (built-in Kotlin, no `kotlin-android` plugin), Kotlin compose plugin 2.2.10, Compose BOM 2026.02.01, Gradle 9.6.0, compileSdk 37, JDK = Studio's bundled JBR. CLI build: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleDebug`.
 - Test hardware: Google Pixel 9 + OnePlus Nord Buds 2.
-- Classic Bluetooth headsets drop to 16 kHz mono call quality (HFP) while the mic is open; music degrades. Expected, not a bug.
+- Classic Bluetooth headsets drop to call quality (HFP) while the mic is open; music degrades. Expected, not a bug.
+- **Pixel 9 + Nord Buds 2 open the HFP link in narrowband (8 kHz, CVSD)**: no energy above 4 kHz (measured 2026-10-25). Deepgram copes, but the sherpa KWS wake word does not (0 detections on real buds audio; 12/12 → 5/12 on synthetic narrowband, sensitivity doesn't help). Wake word needs wideband audio: phone mic, or a headset with mSBC/LE Audio.
 - Some phone brands (Xiaomi, Oppo, Vivo, OnePlus) aggressively kill background services — need battery-optimization exemption.
 - `venv/` at the repo root is Python 3.11 (Homebrew `/opt/homebrew/bin/python3.11`); the backend is installed into it editable (`pip install -e "backend[client,dev]"`). Run backend commands from `backend/`.
 - No fake/mock providers in the app. This is a live demo: if something is needed (API keys, accounts, devices), ask the developer for it. Test-only stand-ins live in `backend/tests/`.
@@ -51,7 +52,7 @@ Read it before making design decisions. If something we decide changes the desig
 ## Open questions (update as resolved)
 
 - Which LLM hits the 450 ms first-sentence target? Resolved: none from India; gpt-4.1-mini fastest (~0.78 s first sentence). End-to-end ≈1.4–1.9 s depending on endpoint_ms.
-- sherpa-onnx false-trigger rate for "Hey Raphael" acceptable, or switch to Porcupine? (decide by Oct 25)
+- sherpa-onnx false-trigger rate for "Hey Raphael" acceptable, or switch to Porcupine? (decide by Oct 25) — Oct 25: sherpa KWS misses the developer's real voice entirely (phone mic and buds); natural "Hey Raphael" is ambiguous even to Deepgram/Whisper. Proposed: Porcupine for the default phrase (awaiting Picovoice AccessKey + .ppn from developer).
 - Hinglish in the demo? (needs Sarvam realtime beta access)
 - Which phone + 3 headsets are we testing on? Pixel 9 + OnePlus Nord Buds 2 (headset spike PASSED 2026-10-25: HFP link ~0.8 s, mic + playback on buds); 2 more headsets TBD.
 - Does the Oct 31 submission include passive whisper mode?

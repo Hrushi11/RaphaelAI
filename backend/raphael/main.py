@@ -3,8 +3,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, WebSocket
 
 from .providers import Providers
 from .session import Session
@@ -40,13 +39,3 @@ async def session(ws: WebSocket, token: str | None = None) -> None:
     await ws.accept()
     await Session(ws, app.state.providers, settings).run()
 
-
-class TokenizeRequest(BaseModel):
-    phrases: list[str] = Field(min_length=1, max_length=3)
-    sensitivity: float = Field(0.5, ge=0.0, le=1.0)
-
-
-@app.post("/v1/wakeword/tokenize")
-async def tokenize(req: TokenizeRequest) -> dict:
-    # Built with the Android wake-word work: needs the sherpa-onnx KWS model's tokens file.
-    raise HTTPException(501, "wake word tokenizer not implemented yet")

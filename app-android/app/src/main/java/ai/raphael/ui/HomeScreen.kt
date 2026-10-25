@@ -41,6 +41,9 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     onTap: () -> Unit,
     onOpenTest: () -> Unit,
+    wakeCard: @Composable () -> Unit,
+    batteryRestricted: Boolean,
+    onAllowBackground: () -> Unit,
 ) {
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
@@ -69,9 +72,14 @@ fun HomeScreen(
                         else -> "Connected · ${ui.route}"
                     }
                     Text(status, style = MaterialTheme.typography.bodyMedium)
+                    Text("Keeps listening with the screen off. Tap your earbud to ask.", style = MaterialTheme.typography.bodySmall)
+                    if (ui.link == Link.READY && ui.handsFree && ui.turn == TurnState.IDLE) {
+                        Text("Say your wake phrase, or tap the button.", style = MaterialTheme.typography.bodyMedium)
+                    }
 
                     val (label, color) = when (ui.turn) {
                         TurnState.IDLE -> "Tap to ask" to MaterialTheme.colorScheme.primary
+                        TurnState.CHECKING -> "Hearing speech… (checking for wake phrase)" to MaterialTheme.colorScheme.primary
                         TurnState.LISTENING -> "Listening… tap to finish" to MaterialTheme.colorScheme.tertiary
                         TurnState.THINKING -> "Thinking… tap to stop" to MaterialTheme.colorScheme.secondary
                         TurnState.SPEAKING -> "Speaking… tap to stop" to MaterialTheme.colorScheme.secondary
@@ -95,10 +103,18 @@ fun HomeScreen(
                     OutlinedButton(onClick = onDisconnect) { Text("Disconnect") }
                 }
 
+                wakeCard()
+
+                if (batteryRestricted) {
+                    OutlinedButton(onClick = onAllowBackground, modifier = Modifier.fillMaxWidth()) {
+                        Text("Allow Raphael to run in the background")
+                    }
+                }
+
                 if (ui.error.isNotEmpty()) {
                     Text(ui.error, color = MaterialTheme.colorScheme.error)
                 }
-                TextButton(onClick = onOpenTest, enabled = ui.link == Link.DISCONNECTED) { Text("Headset audio test") }
+                TextButton(onClick = onOpenTest) { Text("Headset audio test") }
             }
         }
     }

@@ -81,7 +81,8 @@ class ConfigUpdate(_Model):
 class TurnStart(_Model):
     type: Literal["turn.start"]
     turn_id: str
-    trigger: Literal["wake", "tap"] = "tap"
+    # tap: user pressed/tapped. vad: on-device VAD heard speech; backend checks for the wake phrase.
+    trigger: Literal["wake", "tap", "vad"] = "tap"
     preroll_ms: int = 0
 
 
@@ -113,6 +114,10 @@ client_message = TypeAdapter(ClientMessage)
 
 def session_ready(session_id: str) -> dict:
     return {"type": "session.ready", "session_id": session_id}
+
+
+def wake_detected(turn_id: str, phrase: str) -> dict:
+    return {"type": "wake.detected", "turn_id": turn_id, "phrase": phrase}
 
 
 def transcript_partial(turn_id: str, text: str) -> dict:

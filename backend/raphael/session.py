@@ -17,6 +17,7 @@ from fastapi import WebSocket
 from pydantic import ValidationError
 
 from . import protocol as p
+from . import wakeword
 from .chunker import SentenceChunker
 from .providers import Providers
 from .providers.base import ASRProvider, Final, Message, Partial, ProviderError, SpeechEnded
@@ -212,26 +213,49 @@ class Session:
         interim = ""
         start = now_ms()
         last_text_at = start
-        heard = False
         speech_end_s: float | None = None
         finalize_deadline: float | None = None
+        # "vad" turns: the phone heard speech; keep the turn only if it starts with the wake phrase.
+        gated = turn.trigger == "vad"
+        phrases = self.config.wake.phrases
+        woke = not gated
+        question_from = start  # when we started waiting for the question
+
+        def full_text() -> str:
+            return " ".join([*finals, interim]).strip()
+
+        def question() -> str:
+            if not gated:
+                return full_text()
+            m = wakeword.match(full_text(), phrases)
+            return m[1] if m else ""
 
         async def finalize() -> float:
             await asr.finalize()
             return now_ms() + s.finalize_grace_s * 1000
 
+        async def drop(reason: str) -> None:
+            # No transcript in logs or messages: speech without the wake phrase is discarded.
+            log.info("[%s] turn %s dropped: %s", self.id, turn.id, reason)
+            await self.send_json(p.turn_dropped(turn.id, reason))
+
         try:
             while True:
                 deadline = start + s.max_turn_s * 1000
-                if not heard:
-                    deadline = min(deadline, start + s.no_speech_timeout_s * 1000)
+                if not woke:
+                    deadline = min(deadline, start + s.wake_check_s * 1000)
+                elif not question():
+                    deadline = min(deadline, question_from + s.no_speech_timeout_s * 1000)
                 if finalize_deadline:
                     deadline = min(deadline, finalize_deadline)
                 try:
                     ev = await asyncio.wait_for(turn.events.get(), max(0.0, deadline - now_ms()) / 1000)
                 except TimeoutError:
-                    if not heard:
-                        await self.send_json(p.turn_dropped(turn.id, "no_speech"))
+                    if not woke:
+                        await drop("no_wake")
+                        return None
+                    if not question():
+                        await drop("no_speech")
                         return None
                     if finalize_deadline:
                         break  # ASR never confirmed; go with what we have
@@ -245,17 +269,34 @@ class Session:
                 if ev is _END_REQUESTED:
                     if finalize_deadline is None:
                         finalize_deadline = await finalize()
-                elif isinstance(ev, Partial):
-                    heard, interim, last_text_at = True, ev.text, now_ms()
+                    continue
+                if isinstance(ev, Partial):
+                    interim, last_text_at = ev.text, now_ms()
                     speech_end_s = ev.speech_end_s or speech_end_s
-                    await self.send_json(p.transcript_partial(turn.id, " ".join([*finals, interim])))
                 elif isinstance(ev, Final):
-                    heard, interim, last_text_at = True, "", now_ms()
+                    interim, last_text_at = "", now_ms()
                     speech_end_s = ev.speech_end_s or speech_end_s
                     finals.append(ev.text)
-                    await self.send_json(p.transcript_partial(turn.id, " ".join(finals)))
-                elif isinstance(ev, SpeechEnded) and finals:
-                    break
+                elif isinstance(ev, SpeechEnded):
+                    if not woke:
+                        await drop("no_wake")
+                        return None
+                    if question():
+                        break
+                    continue  # paused after "Hey Raphael": keep waiting for the question
+
+                if not woke:
+                    m = wakeword.match(full_text(), phrases)
+                    if m is None:
+                        if wakeword.ruled_out(full_text(), phrases):
+                            await drop("no_wake")
+                            return None
+                        continue
+                    woke, question_from = True, now_ms()
+                    log.info("[%s] turn %s: wake phrase '%s'", self.id, turn.id, m[0])
+                    await self.send_json(p.wake_detected(turn.id, m[0]))
+                if q := question():
+                    await self.send_json(p.transcript_partial(turn.id, q))
         finally:
             turn.listening = False
             for t in tasks:
@@ -263,9 +304,9 @@ class Session:
             self._spawn(self._close_asr(asr))
 
         t_end = now_ms()
-        text = " ".join([*finals, interim]).strip()
+        text = question()
         if not text:
-            await self.send_json(p.turn_dropped(turn.id, "empty"))
+            await drop("empty")
             return None
         log.info("[%s] Q: %s", self.id, text)
         if speech_end_s is not None:

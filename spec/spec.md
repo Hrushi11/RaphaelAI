@@ -13,7 +13,7 @@ v0 turns any Bluetooth headset into a voice assistant. You say a wake word you c
 
 1. **Client app (Android):** picks a paired headset, routes its mic and speaker, and holds every Raphael setting.
 2. **Voice pipeline:** headset mic → speech-to-text → LLM → text-to-speech → headset speaker, streaming end to end.
-3. **Wake word detection:** on-device, with the phrase changeable from the app without a rebuild. Earbud tap as a second trigger.
+3. **Wake word detection:** on-device speech detection plus a cloud check for the phrase (revised Oct 25, §5), changeable from the app instantly. Earbud tap as a second trigger.
 
 ### 1.2 Out of scope (v0)
 
@@ -30,7 +30,7 @@ v0 turns any Bluetooth headset into a voice assistant. You say a wake word you c
 | S1 | End of question → first word of answer (p50, phone on 4G/Wi-Fi) | < 1.5 s |
 | S2 | Wake word changed in app → active | < 5 s, no app update |
 | S3 | Headset compatibility | ≥ 3 brands |
-| S4 | Audio sent off-device before wake word / tap | None |
+| S4 | Audio sent off-device before wake word / tap | Silence: none. Speech: only to check for the wake phrase, never stored (revised Oct 25, §5) |
 
 ---
 
@@ -115,6 +115,8 @@ Classic Bluetooth headsets drop to a 16 kHz mono call-quality link (HFP) while t
 | **Phone mic** | Phone, 16 kHz | Headset, media link (A2DP) | Phone on the table; better audio, music unaffected |
 
 LE Audio headsets (Android 13+) avoid most of the quality drop. Prefer them when listed.
+
+**Measured Oct 25:** Pixel 9 + OnePlus Nord Buds 2 open the call link in **narrowband (8 kHz)**. Speech-to-text still works, but the on-device wake word model fails on narrowband audio (12/12 → 5/12 on filtered test audio, 0 on real buds audio). So with narrowband headsets the wake word must listen on the **phone mic**; headset-mic mode needs a wideband (mSBC) or LE Audio headset, or the earbud-tap trigger.
 
 ### 3.4 Always-on service
 
@@ -226,7 +228,6 @@ class TTSProvider(Protocol):          # one instance per session (socket stays w
 - Python 3.11, FastAPI, Uvicorn, `websockets`/`httpx`, pydantic for message models.
 - Endpoints:
   - `WS /v1/session` — the live session (§6).
-  - `POST /v1/wakeword/tokenize` — phrase → sherpa-onnx keywords line (§5.3).
   - `GET /healthz`.
 - One `Session` object per connection: config, turn history (last N turns), and three asyncio tasks (ASR, LLM, TTS) joined by `asyncio.Queue`s. Cancelling a turn cancels all three.
 - Hosting: Mumbai or Singapore region to keep phone↔server RTT under ~60 ms. For early testing, a laptop behind ngrok.
@@ -234,6 +235,17 @@ class TTSProvider(Protocol):          # one instance per session (socket stays w
 ---
 
 ## 5. Component 3 — Changeable wake word
+
+> **Revised Oct 25 — what we actually ship.** On-device keyword spotting failed on the developer's real voice: sherpa-onnx KWS detected 0 of 6 spoken wake phrases (phone mic and buds), on-device Whisper tiny/base matched 1–2 of 6 with false triggers, and Picovoice now requires a company email. Deepgram transcribed all 6 perfectly. So v0 uses a **cloud wake check gated by on-device VAD**:
+>
+> 1. The phone runs **Silero VAD** (sherpa-onnx) on the mic. Silence never leaves the phone.
+> 2. When speech starts, the phone sends `turn.start` with `trigger: "vad"`, then ~700 ms of pre-roll and the live audio.
+> 3. The backend streams it to Deepgram (wake words added as keyterms) and checks, by sound (`backend/raphael/wakeword.py`), whether the transcript starts with a wake phrase within its first 2 words.
+>    - Yes → `wake.detected`; the phone chimes and the same turn continues as the question ("Hey Raphael, what's 18% of 4 lakh?" works in one breath; a pause after the phrase waits for the question).
+>    - No (speech ended, enough words without it, or 4 s) → `turn.dropped` with reason `no_wake`; transcript is not logged, shown or stored.
+> 4. Changing the phrase is a `config.update` (`wake.phrases`) — active immediately (S2).
+>
+> Works with narrowband headsets too (Deepgram copes with 8 kHz call audio). Trade-off: spoken audio leaves the phone before the wake word (S4 revised). Known false-wake risk: utterances that start with sound-alikes such as "her file…". The sections below describe the original on-device design, kept for the post-hackathon roadmap (own trained model, e.g. openWakeWord-style).
 
 ### 5.1 Engine choice
 
@@ -318,12 +330,13 @@ One WebSocket: `wss://<host>/v1/session?token=<token>`
 |---|---|---|---|
 | Phone → backend | `session.start` | `config`, `client_version` | On connect |
 | Phone → backend | `config.update` | `config` | Any settings change |
-| Phone → backend | `turn.start` | `turn_id`, `trigger` (`wake`\|`tap`), `preroll_ms` | Trigger fired; audio frames follow |
+| Phone → backend | `turn.start` | `turn_id`, `trigger` (`tap`\|`vad`\|`wake`), `preroll_ms` | Trigger fired (`vad` = speech heard, wake phrase not yet checked); audio frames follow |
 | Phone → backend | `turn.end` | `turn_id` | Second tap ends the question early |
 | Phone → backend | `turn.cancel` | `turn_id` | Barge-in or Pause |
 | Phone → backend | `ping` | `t` | Every 10 s |
 | Backend → phone | `session.ready` | `session_id` | Config accepted |
-| Backend → phone | `transcript.partial` | `turn_id`, `text` | While the user speaks |
+| Backend → phone | `wake.detected` | `turn_id`, `phrase` | `vad` turn started with the wake phrase |
+| Backend → phone | `transcript.partial` | `turn_id`, `text` | While the user speaks (question only, wake phrase stripped) |
 | Backend → phone | `transcript.final` | `turn_id`, `text` | Question ended |
 | Backend → phone | `reply.text` | `turn_id`, `delta` | LLM tokens, for Home screen |
 | Backend → phone | `reply.audio_start` | `turn_id`, `sample_rate` | Before first reply audio frame |
@@ -486,7 +499,7 @@ Raphael AI/                         (repo root)
 ### 8.4 Open questions
 
 - [x] Which LLM meets the 450 ms first-sentence target? None from India: OpenAI `gpt-4.1-mini` was fastest (~0.65 s first token, ~0.78 s first sentence, median, warm); gpt-4o-mini tied; gpt-5.4-mini/nano ~0.9 s; gpt-5.6/gpt-6 1.0–1.2 s. Chosen: gpt-4.1-mini.
-- [ ] Is sherpa-onnx's false-trigger rate acceptable for "Hey Raphael"? Decide sherpa vs Porcupine by Oct 25.
+- [ ] Is sherpa-onnx's false-trigger rate acceptable for "Hey Raphael"? Decide sherpa vs Porcupine by Oct 25. **Oct 25 finding:** false triggers are fine, but detection fails on the developer's real voice (0 hits on phone-mic and buds recordings; works on synthetic voices). Said naturally, "Hey Raphael" is ambiguous even for cloud ASR (Deepgram: "hair file"; Whisper: "hit a file"). Leaning to Porcupine for the default phrase; sherpa kept for custom phrases.
 - [ ] Is Hinglish in the demo? If yes, request Sarvam realtime beta access now.
 - [ ] Which 3 headsets do we test on? (1 of 3: OnePlus Nord Buds 2 — passed; phone: Pixel 9)
 - [ ] Does the Oct 31 submission include passive whisper mode, or only the wake-word assistant?

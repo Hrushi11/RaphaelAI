@@ -12,6 +12,7 @@ import ai.raphael.audio.ReplyPlayer
 import ai.raphael.audio.label
 import ai.raphael.net.Msg
 import ai.raphael.net.SessionClient
+import ai.raphael.wake.VadGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,11 +20,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
 
-enum class TurnState { IDLE, LISTENING, THINKING, SPEAKING }
+/** CHECKING = speech heard, backend is checking for the wake phrase (nothing shown yet). */
+enum class TurnState { IDLE, CHECKING, LISTENING, THINKING, SPEAKING }
 enum class Link { DISCONNECTED, CONNECTING, READY }
 enum class MicMode { HEADSET, PHONE }
 
@@ -35,15 +41,26 @@ data class UiState(
     val answer: String = "",
     val timings: String = "",
     val error: String = "",
+    val handsFree: Boolean = true,
+    val wakePhrase: String = "",
+    val wakes: List<String> = emptyList(),
+    val ignoredBursts: Int = 0,
 )
 
 /**
- * Phone-side turn state machine (spec §3.5), tap-to-talk for now.
+ * Phone-side turn state machine (spec §3.5).
  *
- * All state changes happen on the [scope]'s thread (Main). The mic thread only
- * reads [streamingTurn] to decide whether a frame goes to the backend.
+ * Triggers: on-screen tap, or hands-free: the on-device VAD hears speech, the
+ * burst is streamed to the backend, which keeps the turn only if it starts with
+ * the wake phrase (wake.detected) and drops it otherwise (turn.dropped no_wake).
+ *
+ * All state changes happen on [scope] (Main). The mic thread only reads volatile flags.
  */
-class TurnController(private val router: AudioRouter, private val scope: CoroutineScope) {
+class TurnController(
+    private val router: AudioRouter,
+    private val scope: CoroutineScope,
+    private val vad: VadGate,
+) {
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui
 
@@ -52,19 +69,49 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
     private var player: ReplyPlayer? = null
     private var eventsJob: Job? = null
     private var turnId: String? = null
+    private var mode = MicMode.HEADSET
 
     @Volatile
     private var streamingTurn: String? = null
 
-    // Last 300 ms of mic audio, sent right after turn.start so the first word isn't clipped.
+    // Hands-free gate state (read on the mic thread).
+    @Volatile
+    private var vadArmed = false
+
+    @Volatile
+    private var vadResetPending = true
+
+    @Volatile
+    private var waitForSilence = false // after a dropped burst, ignore the rest of that utterance
+
+    // Audio from just before a trigger, sent first so the start of the phrase isn't clipped.
+    // 700 ms: the VAD needs ~200-400 ms of speech before it fires.
     private val preroll = ArrayBlockingQueue<ByteArray>(PREROLL_FRAMES)
     private val chime = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 50)
 
+    init {
+        scope.launch {
+            ui.collect { s ->
+                val armed = s.handsFree && s.link == Link.READY && s.turn == TurnState.IDLE
+                if (armed && !vadArmed) vadResetPending = true
+                vadArmed = armed
+            }
+        }
+    }
+
+    fun setWakePhrase(phrase: String) {
+        _ui.update { it.copy(wakePhrase = phrase) }
+        client?.send(Msg.configUpdate(config()))
+    }
+
+    fun setHandsFree(on: Boolean) = _ui.update { it.copy(handsFree = on) }
+
     fun connect(url: String, mode: MicMode, headset: AudioDeviceInfo?) {
         if (_ui.value.link != Link.DISCONNECTED) return
-        _ui.value = UiState(link = Link.CONNECTING)
+        this.mode = mode
+        _ui.update { it.copy(link = Link.CONNECTING, error = "", heard = "", answer = "", timings = "") }
         scope.launch {
-            // 1. Audio route. Held open while connected so a tap starts capture instantly.
+            // 1. Audio route. Held open while connected so a trigger starts capture instantly.
             val routeLabel = if (mode == MicMode.HEADSET) {
                 if (headset == null || !router.routeTo(headset)) {
                     fail("Couldn't open the headset voice link. Try Phone mic mode.")
@@ -87,7 +134,7 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
             // 3. Backend.
             val c = SessionClient()
             client = c
-            eventsJob = scope.launch { for (ev in c.events) onEvent(ev, mode) }
+            eventsJob = scope.launch { for (ev in c.events) onEvent(ev) }
             c.connect(url)
         }
     }
@@ -108,15 +155,11 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
         val c = client ?: return
         if (_ui.value.link != Link.READY) return
         when (_ui.value.turn) {
-            TurnState.IDLE -> {
-                val id = UUID.randomUUID().toString().take(8)
-                turnId = id
-                chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
-                val frames = preroll.toList()
-                c.send(Msg.turnStart(id, "tap", frames.size * 20))
-                frames.forEach(c::sendAudio)
-                streamingTurn = id
-                _ui.update { it.copy(turn = TurnState.LISTENING, heard = "", answer = "", timings = "", error = "") }
+            TurnState.IDLE -> startTurn(c, "tap", chimeNow = true)
+            TurnState.CHECKING -> { // user didn't wait for the wake check: make it a tap turn
+                turnId?.let { c.send(Msg.turnCancel(it)) }
+                streamingTurn = null
+                startTurn(c, "tap", chimeNow = true)
             }
             TurnState.LISTENING -> turnId?.let { c.send(Msg.turnEnd(it)) }
             TurnState.THINKING, TurnState.SPEAKING -> {
@@ -128,22 +171,56 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
         }
     }
 
-    // Runs on the mic thread.
-    private fun onMicFrame(frame: ByteArray) {
-        val id = streamingTurn
-        if (id != null) {
-            client?.sendAudio(frame)
-        } else {
-            if (!preroll.offer(frame)) {
-                preroll.poll()
-                preroll.offer(frame)
-            }
+    private fun startTurn(c: SessionClient, trigger: String, chimeNow: Boolean) {
+        val id = UUID.randomUUID().toString().take(8)
+        turnId = id
+        if (chimeNow) chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+        val frames = preroll.toList()
+        preroll.clear()
+        c.send(Msg.turnStart(id, trigger, frames.size * 20))
+        frames.forEach(c::sendAudio)
+        streamingTurn = id
+        val state = if (trigger == "vad") TurnState.CHECKING else TurnState.LISTENING
+        _ui.update {
+            if (state == TurnState.CHECKING) it.copy(turn = state)
+            else it.copy(turn = state, heard = "", answer = "", timings = "", error = "")
         }
     }
 
-    private fun onEvent(ev: SessionClient.Event, mode: MicMode) {
+    private fun onSpeechStart() {
+        val c = client ?: return
+        if (_ui.value.link == Link.READY && _ui.value.turn == TurnState.IDLE && _ui.value.handsFree) {
+            startTurn(c, "vad", chimeNow = false)
+        }
+    }
+
+    // Runs on the mic thread. Nothing leaves the phone until a trigger sets streamingTurn.
+    private fun onMicFrame(frame: ByteArray) {
+        if (streamingTurn != null) {
+            client?.sendAudio(frame)
+            return
+        }
+        if (!preroll.offer(frame)) {
+            preroll.poll()
+            preroll.offer(frame)
+        }
+        if (!vadArmed) return
+        if (vadResetPending) {
+            vad.reset()
+            vadResetPending = false
+        }
+        val speech = vad.accept(frame)
+        if (waitForSilence) {
+            if (!speech) waitForSilence = false
+        } else if (speech) {
+            waitForSilence = true // one burst per utterance
+            scope.launch { onSpeechStart() }
+        }
+    }
+
+    private fun onEvent(ev: SessionClient.Event) {
         when (ev) {
-            SessionClient.Event.Open -> client?.send(Msg.sessionStart(config(mode)))
+            SessionClient.Event.Open -> client?.send(Msg.sessionStart(config()))
             is SessionClient.Event.Closed -> {
                 if (_ui.value.link != Link.DISCONNECTED) {
                     disconnect()
@@ -163,6 +240,14 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
         if (forTurn.isNotEmpty() && forTurn != turnId) return // stale turn
         when (type) {
             "session.ready" -> _ui.update { it.copy(link = Link.READY) }
+            "wake.detected" -> {
+                chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+                val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+                _ui.update {
+                    it.copy(turn = TurnState.LISTENING, heard = "", answer = "", timings = "", error = "",
+                        wakes = (listOf("$time  “${m.optString("phrase")}”") + it.wakes).take(5))
+                }
+            }
             "transcript.partial" -> _ui.update { it.copy(heard = m.getString("text")) }
             "transcript.final" -> {
                 streamingTurn = null
@@ -180,7 +265,10 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
             }
             "turn.dropped" -> {
                 streamingTurn = null
-                _ui.update { it.copy(error = "Didn't catch a question (${m.optString("reason")})") }
+                when (val reason = m.optString("reason")) {
+                    "no_wake" -> _ui.update { it.copy(ignoredBursts = it.ignoredBursts + 1) } // silent
+                    else -> _ui.update { it.copy(error = "Didn't catch a question ($reason)") }
+                }
                 toIdle()
             }
             "error" -> {
@@ -197,21 +285,21 @@ class TurnController(private val router: AudioRouter, private val scope: Corouti
         _ui.update { it.copy(error = message) }
     }
 
-    private fun config(mode: MicMode) = JSONObject()
+    private fun config() = JSONObject()
         .put("version", 1)
         .put("device", JSONObject().put("mic_source", if (mode == MicMode.HEADSET) "headset" else "phone"))
+        .put("wake", JSONObject().put("phrases", JSONArray().put(_ui.value.wakePhrase.ifBlank { "hey raphael" })))
         .put("assistant", JSONObject().put("max_sentences", 2).put("language", "en-IN"))
         .put("asr", JSONObject().put("provider", "deepgram").put("endpoint_ms", 500))
 
     private fun formatTimings(t: JSONObject?): String {
         if (t == null) return ""
-        val total = t.opt("total_ms")
         return "end of speech → first audio ${t.opt("first_audio_ms")} ms · silence wait ${t.opt("eos_ms")} ms · " +
-            "LLM first sentence ${t.opt("llm_first_sentence_ms")} ms · TTS ${t.opt("tts_first_audio_ms")} ms · total $total ms"
+            "LLM first sentence ${t.opt("llm_first_sentence_ms")} ms · TTS ${t.opt("tts_first_audio_ms")} ms · total ${t.opt("total_ms")} ms"
     }
 
     companion object {
         private const val TAG = "RaphaelTurn"
-        private const val PREROLL_FRAMES = 15
+        private const val PREROLL_FRAMES = 35
     }
 }

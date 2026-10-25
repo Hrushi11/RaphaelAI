@@ -46,10 +46,20 @@ phone                                   backend
   more for it, not even `reply.done`. The phone flushes its own playback.
 - Messages for a `turn_id` other than the current one are ignored.
 
+## Hands-free (`trigger: "vad"`) turns
+
+The phone's VAD heard speech; the backend checks whether it starts with a wake phrase from `config.wake.phrases`.
+
+- Before the phrase is found nothing is sent to the phone (no partials).
+- Found → `wake.detected {turn_id, phrase}`; the turn continues as a normal question. Partials and `transcript.final` contain only the question, with the wake phrase stripped.
+- A pause right after the phrase doesn't end the turn; the backend waits up to 6 s for the question.
+- Not found → `turn.dropped` with reason `no_wake`. The transcript is not logged.
+
 ## `turn.dropped` reasons
 
 | reason | meaning |
 |---|---|
+| `no_wake` | `vad` turn without the wake phrase (speech ended, too many words, or 4 s) |
 | `no_speech` | No words heard within 6 s of `turn.start` |
 | `empty` | STT finished with an empty transcript |
 | `asr_failed`, `llm_failed`, `tts_failed`, `internal` | A stage failed; an `error` message comes first |

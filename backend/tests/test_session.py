@@ -211,3 +211,42 @@ def test_system_prompt_has_rules(lang):
 
     prompt = build_system_prompt(AssistantConfig(language=lang, max_sentences=3))
     assert "at most 3 short sentences" in prompt
+
+
+def vad_turn(script, frames=4):
+    providers = StubProviders(script)
+    with make_client(providers).websocket_connect("/v1/session") as ws:
+        start(ws)
+        ws.send_text(json.dumps({"type": "turn.start", "turn_id": "v1", "trigger": "vad"}))
+        for _ in range(frames):
+            ws.send_bytes(FRAME)
+        got = []
+        while True:
+            msg = ws.receive()
+            if msg.get("bytes") is not None:
+                continue
+            data = json.loads(msg["text"])
+            got.append(data)
+            if data["type"] in ("reply.done", "turn.dropped"):
+                return got, providers
+
+
+def test_vad_turn_with_wake_phrase_and_question():
+    got, providers = vad_turn([Partial("hey rafael what"), Final("hey rafael what is the time"), SpeechEnded()])
+    types = [m["type"] for m in got]
+    assert types.index("wake.detected") < types.index("transcript.final")
+    assert next(m for m in got if m["type"] == "transcript.final")["text"] == "what is the time"
+    partials = [m["text"] for m in got if m["type"] == "transcript.partial"]
+    assert all("rafael" not in t for t in partials)  # wake phrase stripped from what the user sees
+
+
+def test_vad_turn_without_wake_phrase_is_dropped_silently():
+    got, providers = vad_turn([Partial("so I was"), Final("so I was thinking we could go"), SpeechEnded()])
+    assert got[-1] == {"type": "turn.dropped", "turn_id": "v1", "reason": "no_wake"}
+    assert not any(m["type"] == "transcript.partial" for m in got)  # nothing shown
+    assert providers._llm.calls == []
+
+
+def test_vad_turn_pause_after_wake_phrase_waits_for_question():
+    got, _ = vad_turn([Final("hey raphael"), SpeechEnded(), Final("how far is the moon"), SpeechEnded()])
+    assert next(m for m in got if m["type"] == "transcript.final")["text"] == "how far is the moon"

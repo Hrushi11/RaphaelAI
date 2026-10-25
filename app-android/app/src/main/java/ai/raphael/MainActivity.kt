@@ -6,7 +6,11 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.MediaRecorder
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,18 +26,20 @@ import ai.raphael.audio.label
 import ai.raphael.audio.play
 import ai.raphael.audio.record
 import ai.raphael.service.MicMode
+import ai.raphael.service.RaphaelService
 import ai.raphael.service.TurnController
 import ai.raphael.ui.HomeScreen
 import ai.raphael.ui.MicSource
 import ai.raphael.ui.SpikeScreen
 import ai.raphael.ui.SpikeState
+import ai.raphael.ui.WakeWordCard
+import ai.raphael.wake.WakeWordStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Headset audio spike (CLAUDE.md: first Android task).
- * Records 5 s from the chosen mic and plays it back, reporting which devices
- * Android actually used. Answers: does the headset mic work on this phone?
+ * Home screen (talk to Raphael) plus the headset audio test from the day-1 spike.
+ * The session itself runs in [RaphaelService], so closing this screen keeps listening.
  */
 class MainActivity : ComponentActivity() {
     private lateinit var router: AudioRouter
@@ -43,6 +49,9 @@ class MainActivity : ComponentActivity() {
     private val showTest = mutableStateOf(false)
     private val url = mutableStateOf("")
     private val mode = mutableStateOf(MicMode.HEADSET)
+    private lateinit var wakeStore: WakeWordStore
+    private val wakePhrase = mutableStateOf("")
+    private val batteryRestricted = mutableStateOf(false)
 
     private val state = SpikeState(
         headsets = mutableStateListOf(),
@@ -60,8 +69,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        router = AudioRouter(this)
-        controller = TurnController(router, lifecycleScope)
+        Raphael.init(this)
+        router = Raphael.router
+        controller = Raphael.controller
+        wakeStore = WakeWordStore(this)
+        wakePhrase.value = wakeStore.phrase
+        if (controller.ui.value.wakePhrase.isEmpty()) controller.setWakePhrase(wakeStore.phrase)
         val prefs = getSharedPreferences("raphael", MODE_PRIVATE)
         url.value = prefs.getString("url", DEFAULT_URL) ?: DEFAULT_URL
         setContent {
@@ -69,7 +82,7 @@ class MainActivity : ComponentActivity() {
             if (showTest.value || !state.hasPermission.value) {
                 SpikeScreen(
                     state = state,
-                    onGrant = { askPermissions.launch(PERMISSIONS) },
+                    onGrant = { askPermissions.launch(PERMISSIONS + Manifest.permission.POST_NOTIFICATIONS) },
                     onRefresh = { refresh() },
                     onRun = { runTest() },
                     onBack = if (state.hasPermission.value) ({ showTest.value = false }) else null,
@@ -86,12 +99,29 @@ class MainActivity : ComponentActivity() {
                     onHeadset = { state.selectedId.value = it },
                     onConnect = {
                         prefs.edit().putString("url", url.value.trim()).apply()
-                        val headset = state.headsets.firstOrNull { it.id == state.selectedId.value }
-                        controller.connect(url.value.trim(), mode.value, headset)
+                        RaphaelService.connect(this, url.value.trim(), mode.value, state.selectedId.value)
                     },
-                    onDisconnect = { controller.disconnect() },
+                    onDisconnect = { RaphaelService.stop(this) },
                     onTap = { controller.tap() },
-                    onOpenTest = { showTest.value = true },
+                    onOpenTest = { RaphaelService.stop(this); showTest.value = true },
+                    batteryRestricted = batteryRestricted.value,
+                    onAllowBackground = { askBatteryExemption() },
+                    wakeCard = {
+                        WakeWordCard(
+                            handsFree = ui.handsFree,
+                            onHandsFree = controller::setHandsFree,
+                            phrase = wakePhrase.value,
+                            onPhrase = { wakePhrase.value = it },
+                            activePhrase = ui.wakePhrase,
+                            onSave = {
+                                val phrase = wakePhrase.value.trim().lowercase()
+                                wakeStore.phrase = phrase
+                                controller.setWakePhrase(phrase) // instant: just a config update
+                            },
+                            wakes = ui.wakes,
+                            ignoredBursts = ui.ignoredBursts,
+                        )
+                    },
                 )
             }
         }
@@ -103,13 +133,21 @@ class MainActivity : ComponentActivity() {
         deviceCallback = router.watch { refresh() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        batteryRestricted.value = !getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+    }
+
     override fun onStop() {
         deviceCallback?.let(router::unwatch)
-        job?.cancel()
-        // No background service yet: leaving the app ends the session.
-        controller.disconnect()
-        router.release()
+        job?.cancel() // only the audio test; the session keeps running in RaphaelService
         super.onStop()
+    }
+
+    /** Spec §3.4: ask Android not to kill Raphael in the background. */
+    @android.annotation.SuppressLint("BatteryLife")
+    private fun askBatteryExemption() {
+        startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
     }
 
     private fun refresh() {

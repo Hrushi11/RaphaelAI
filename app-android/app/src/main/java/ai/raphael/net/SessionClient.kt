@@ -77,6 +77,8 @@ object Msg {
     fun sessionStart(config: JSONObject) = JSONObject()
         .put("type", "session.start").put("config", config).put("client_version", "android-0.2")
 
+    fun configUpdate(config: JSONObject) = JSONObject().put("type", "config.update").put("config", config)
+
     fun turnStart(turnId: String, trigger: String, prerollMs: Int) = JSONObject()
         .put("type", "turn.start").put("turn_id", turnId).put("trigger", trigger).put("preroll_ms", prerollMs)
 
