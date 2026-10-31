@@ -107,6 +107,23 @@ Phone and Mac must be on the **same Wi-Fi network**.
   in your router's DHCP settings.
 - Phone and Mac are on different networks (e.g. phone on 4G or a guest Wi-Fi).
 
+## Build a downloadable APK
+
+```bash
+cd ~/raphael/app-android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease
+mkdir -p dist && cp app/build/outputs/apk/release/app-release.apk dist/Raphael-v0.5.apk
+```
+
+- Signed with the release key `~/.android/raphael-release.jks`; its passwords are in
+  `app-android/keystore.properties`. Both are git-ignored. **Back them up** — every future
+  update must be signed with the same key, or phones refuse to install it.
+- Bump `versionCode` / `versionName` in `app-android/app/build.gradle.kts` for each new APK.
+- Installing on a phone: open the APK, allow "Install unknown apps" for the browser/Files app,
+  and choose "Install anyway" if Play Protect warns (normal for apps outside the Play Store).
+- A phone that has the *debug* build (from Android Studio) must uninstall it first:
+  the two builds are signed with different keys.
+
 ## Tests
 
 ```bash

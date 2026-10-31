@@ -90,7 +90,10 @@ fun SettingsScreen(
                     Spacer(Modifier.width(18.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Server", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text)
-                        Text(serverUrl.removeSuffix("/v1/session"), style = MaterialTheme.typography.bodyLarge, color = Rc.Lavender, maxLines = 1)
+                        Text(
+                            serverUrl.removeSuffix("/v1/session"), style = MaterialTheme.typography.bodyMedium, color = Rc.Lavender,
+                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
                     }
                     val (statusText, statusColor) = when (link) {
                         Link.READY -> "Connected" to Rc.Green

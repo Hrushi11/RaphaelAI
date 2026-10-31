@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -24,6 +25,12 @@ val fetchSherpa by tasks.registering {
 }
 tasks.named("preBuild") { dependsOn(fetchSherpa) }
 
+// Release signing key: app-android/keystore.properties (git-ignored) points to a keystore
+// outside the repo. Keep both backed up: updates must be signed with the same key.
+val keystoreProps = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
 android {
     namespace = "ai.raphael"
     compileSdk = 37
@@ -32,10 +39,29 @@ android {
         applicationId = "ai.raphael"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.5-ui"
+        versionCode = 5
+        versionName = "0.5"
         ndk {
             abiFilters += "arm64-v8a" // Pixel 9 and all recent phones; keeps the APK small
+        }
+    }
+
+    signingConfigs {
+        if (keystoreProps.isNotEmpty()) create("release") {
+            storeFile = file(keystoreProps.getProperty("storeFile"))
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
+    buildTypes {
+        release {
+            // Shrink code + resources: drops ~40 MB of unused icon classes. sherpa-onnx JNI classes are kept in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

@@ -53,17 +53,27 @@ private fun inter(weight: Int) = Font(
 
 val Inter = FontFamily(inter(400), inter(500), inter(600), inter(700))
 
+/**
+ * ONE knob for all text sizes in the app. 1.0 = the original sizes; 0.85 = 15 % smaller.
+ * Every font size below (and the few hard-coded ones on other screens, via [fs]) is multiplied by this.
+ * Note: Android's own "Font size" setting (Settings → Display) still scales on top of this.
+ */
+const val FontScale = 0.85f
+
+/** Scaled font size: use `fs(20)` instead of `20.sp`. */
+fun fs(size: Number) = (size.toFloat() * FontScale).sp
+
 private val typography = Typography(
-    displayMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 40.sp, lineHeight = 46.sp, letterSpacing = (-0.5).sp),
-    headlineLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.4).sp),
-    headlineSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-    titleLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
-    titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 17.sp, lineHeight = 22.sp),
-    bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 18.sp, lineHeight = 25.sp),
-    bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 21.sp),
-    bodySmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 18.sp),
-    labelLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 15.sp),
-    labelMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 1.2.sp),
+    displayMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(40), lineHeight = fs(46), letterSpacing = fs(-0.5)),
+    headlineLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(34), lineHeight = fs(40), letterSpacing = fs(-0.4)),
+    headlineSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(22), lineHeight = fs(28)),
+    titleLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(20), lineHeight = fs(26)),
+    titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(17), lineHeight = fs(22)),
+    bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(18), lineHeight = fs(25)),
+    bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(15), lineHeight = fs(21)),
+    bodySmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(13), lineHeight = fs(18)),
+    labelLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(15)),
+    labelMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(13), letterSpacing = fs(1.2)),
 )
 
 @Composable

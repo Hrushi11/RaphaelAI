@@ -63,6 +63,7 @@ import ai.raphael.ui.theme.SmallDiamond
 import ai.raphael.ui.theme.TwoToneTitle
 import ai.raphael.ui.theme.WaveStyle
 import ai.raphael.ui.theme.Waveform
+import ai.raphael.ui.theme.fs
 
 /** Shared frame for onboarding screens: optional back button, small diamond, scrollable body. */
 @Composable
@@ -93,8 +94,8 @@ fun WelcomeScreen(onStart: () -> Unit) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Diamond(DiamondMood.IDLE, { 0f }, Modifier.fillMaxWidth(0.82f))
             }
-            Text("Raphael", style = MaterialTheme.typography.displayMedium.copy(fontSize = 64.sp, lineHeight = 70.sp), color = Rc.Text)
-            Text("Your advisor, in your ear.", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontSize = 26.sp), color = Rc.Lavender)
+            Text("Raphael", style = MaterialTheme.typography.displayMedium.copy(fontSize = fs(64), lineHeight = fs(70)), color = Rc.Text)
+            Text("Your advisor, in your ear.", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontSize = fs(26)), color = Rc.Lavender)
             Spacer(Modifier.height(72.dp))
             GradientButton("Get started", onStart)
             Spacer(Modifier.height(20.dp))

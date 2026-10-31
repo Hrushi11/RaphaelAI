@@ -6,3 +6,6 @@ local.properties
 *.iml
 captures/
 app/libs/*.aar
+keystore.properties
+*.jks
+dist/

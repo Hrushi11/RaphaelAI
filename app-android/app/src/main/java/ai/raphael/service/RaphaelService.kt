@@ -234,7 +234,7 @@ class RaphaelService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // readable on the lock screen (mock 10)
             .setColor(0xFF7C4DFF.toInt())
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.drawable.diamond_small))
         if (!paused) b.addAction(0, "Ask", action(ACTION_TAP, 1))
         b.addAction(0, if (paused) "Resume" else "Pause", action(if (paused) ACTION_RESUME else ACTION_PAUSE, 2))
         b.addAction(0, "Stop", action(ACTION_STOP, 3))
