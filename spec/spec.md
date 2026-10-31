@@ -93,6 +93,8 @@ A cross-platform framework (Flutter / React Native) would still need all of this
 
 **Risk reducers:** start from the sherpa-onnx Android KWS demo; use default Material components only; do the headset audio spike on day 1.
 
+**Visual design (revised Oct 31):** the app gets a custom dark look: glowing glass diamond visualizer, glass cards, waveform, three round controls. Journey, image prompts and design tokens: `design/ui-prompts.md`. Built with Compose on top of Material 3 components (colours and shapes themed, not replaced).
+
 ### 3.2 Bluetooth connection
 
 Raphael does not pair headsets itself. The user pairs once in Android Settings; the app lists headsets Android can route voice audio to and lets the user pick one.

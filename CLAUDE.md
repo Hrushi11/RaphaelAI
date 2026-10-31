@@ -21,7 +21,7 @@ Read it before making design decisions. If something we decide changes the desig
 ## Key decisions already made
 
 - **v0 scope:** client app + voice pipeline + changeable wake word. Out of scope: context ingestion, memory, passive whisper mode, Bolna calls, iOS.
-- **App:** native Android, Kotlin + Jetpack Compose (Material 3 defaults, no custom design). Min SDK 31. Reason: Bluetooth routing, foreground mic service, low-latency audio and sherpa-onnx are all native; a cross-platform framework would add bridge code without saving work.
+- **App:** native Android, Kotlin + Jetpack Compose. Visual design revised Oct 31: custom dark diamond look themed on top of Material 3 (`design/ui-prompts.md`). Min SDK 31. Reason: Bluetooth routing, foreground mic service, low-latency audio and sherpa-onnx are all native; a cross-platform framework would add bridge code without saving work.
 - **Phone is the hub.** Headset = mic + speaker only. Phone runs VAD + wake word on-device; backend does STT/LLM/TTS.
 - **Wake word (revised Oct 25):** on-device Silero VAD gates the mic; speech bursts go to the backend, which checks the Deepgram transcript for the wake phrase by sound (`backend/raphael/wakeword.py`) and drops the turn (`no_wake`) otherwise. On-device KWS (sherpa) and on-device Whisper failed on the developer's real voice; Picovoice needs a company email. Earbud tap via `MediaSession` is a second trigger.
 - **Backend:** Python 3.11 + FastAPI, one WebSocket `/v1/session`, JSON control frames + binary 16 kHz mono PCM16 frames (20 ms / 640 bytes). Providers behind `ASRProvider` / `LLMProvider` / `TTSProvider` interfaces.
