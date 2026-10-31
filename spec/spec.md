@@ -150,7 +150,8 @@ LE Audio headsets (Android 13+) avoid most of the quality drop. Prefer them when
 
 | Screen | What the user does |
 |---|---|
-| **Home** | Sees connected headset and state; big Pause toggle; last question and answer; live partial transcript |
+| **Dashboard** (added Oct 31, mock 13) | App home; the app always opens here. Greeting, listening status with Pause, earbuds, "Talk to Raphael" card, connected tools (MCP servers reported in `session.ready`) |
+| **Home** (talk screen) | Opened from the dashboard card, or automatically when a wake word / tap starts a turn. State, live transcript, answer |
 | **Headset** | Picks a headset; picks mic source; mic test (live level meter); speaker test; earbud tap test |
 | **Wake word** | Types phrase(s); sets sensitivity; toggles earbud-tap trigger; test mode showing each detection + score |
 | **Assistant** | Edits persona prompt; max answer length; voice; language (English / Hinglish) |
@@ -235,6 +236,31 @@ class TTSProvider(Protocol):          # one instance per session (socket stays w
 - Hosting: Mumbai or Singapore region to keep phone↔server RTT under ~60 ms. For early testing, a laptop behind ngrok.
 
 ---
+
+## 4b. Agent and tools (MCP) — added Oct 31
+
+Raphael's LLM is now an **agent**: before answering it may call tools, in a loop, then speaks the result.
+
+- **MCP hub** (`backend/raphael/mcp_hub.py`): the backend is an MCP client (official Python SDK v2). Servers are listed in
+  `backend/mcp_servers.json` — a local command (stdio) or a remote URL (Streamable HTTP); `${VARS}` come from `backend/.env`;
+  `tools` limits which tools the LLM sees (fewer = faster). Tools are exposed as `<server>__<tool>`.
+- **Agent loop** (`backend/raphael/agent.py`): OpenAI tool calling, one action per step (no parallel calls), max 10 steps.
+  Says a short "On it." before the first tool. Navigating/reading never needs permission; sending, calling, paying, deleting
+  need a spoken yes first. The prompt also carries the current date/time (`TIMEZONE`, default Asia/Kolkata).
+- **Phone server** (`backend/mcp/android-mcp-server`, forked from minhalvp/android-mcp-server, Apache-2.0): controls the phone over
+  **adb (USB or Wi-Fi debugging)** from the machine running the backend. Shortcut tools (one step, ~0.1–0.5 s): `set_timer`, `set_alarm`,
+  `device_info`, `set_setting` (dark mode, Wi-Fi, Bluetooth, DND, mobile data), `open_settings`, `find_contact`, `whatsapp_message` /
+  `sms_message` (open the chat with the text typed, NOT sent). Screen tools: `open_app`, `open_link`, `read_screen` (numbered elements;
+  element numbers are invalidated after every action), `tap`, `type_text`, `press`, `swipe`, `read_notifications`.
+  `uiautomator dump` can't read screens that never go idle ("could not get idle state", ~12 s): it is capped at 5 s and
+  `read_screen` then returns a screenshot that the LLM reads (vision), tapping with `tap_point(x, y)`.
+  No arbitrary shell tool. Limitation: needs the phone paired with the backend machine — fine for the demo, not for other users;
+  the in-app accessibility version (same tools over the session WebSocket) is the post-hackathon path.
+- **Web search** (`web` server): Tavily remote MCP, enabled when `TAVILY_API_KEY` is set.
+
+Measured Oct 31 (emulator, `backend/tools/agent_bench.py`): before shortcuts every model (gpt-4.1-mini, gpt-4.1, gpt-5.4-mini, gpt-5.5)
+passed 2/3, 13–38 s average; bigger models were slower, not more accurate. With shortcuts + screenshot fallback: gpt-4.1-mini 5/5,
+avg 3.1 s (most tasks 1 step, ~2 s; busy screen 8 s). Kept gpt-4.1-mini.
 
 ## 5. Component 3 — Changeable wake word
 

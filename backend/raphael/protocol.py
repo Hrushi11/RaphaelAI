@@ -112,8 +112,9 @@ client_message = TypeAdapter(ClientMessage)
 # Plain dict builders: cheap, and keep the outgoing shapes in one place.
 
 
-def session_ready(session_id: str) -> dict:
-    return {"type": "session.ready", "session_id": session_id}
+def session_ready(session_id: str, tools: list[str] | None = None) -> dict:
+    """`tools`: names of the MCP servers the agent can use (e.g. ["phone", "web"]), for the app's dashboard."""
+    return {"type": "session.ready", "session_id": session_id, "tools": tools or []}
 
 
 def wake_detected(turn_id: str, phrase: str) -> dict:

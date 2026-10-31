@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Hearing
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayCircleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -53,6 +54,8 @@ import ai.raphael.ui.theme.Rc
 /** Settings (mock 11). */
 @Composable
 fun SettingsScreen(
+    name: String,
+    onName: (String) -> Unit,
     serverUrl: String,
     link: Link,
     headsetLabel: String,
@@ -70,6 +73,7 @@ fun SettingsScreen(
     onAudioTest: () -> Unit,
 ) {
     var editing by remember { mutableStateOf(false) }
+    var editingName by remember { mutableStateOf(false) }
     RaphaelBackground {
         Column(
             Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp),
@@ -82,6 +86,9 @@ fun SettingsScreen(
                 Spacer(Modifier.width(28.dp))
                 Text("Settings", style = MaterialTheme.typography.headlineLarge, color = Rc.Text)
             }
+
+            Section("You")
+            Row1(Icons.Rounded.Person, "Name", name.ifBlank { "Add your name for the greeting" }) { editingName = true }
 
             Section("Connection")
             GlassCard(Modifier.fillMaxWidth(), onClick = { editing = true }) {
@@ -138,6 +145,7 @@ fun SettingsScreen(
     }
 
     if (editing) ServerDialog(serverUrl, onDismiss = { editing = false }, onSave = { onServerUrl(it); editing = false })
+    if (editingName) NameDialog(name, onDismiss = { editingName = false }, onSave = { onName(it); editingName = false })
 }
 
 @Composable
@@ -188,6 +196,19 @@ private fun ServerDialog(current: String, onDismiss: () -> Unit, onSave: (String
             }
         },
         confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save & reconnect", color = Rc.Lavender) } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = Rc.TextDim) } },
+    )
+}
+
+@Composable
+private fun NameDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var value by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF14163A),
+        title = { Text("Your name", color = Rc.Text) },
+        text = { OutlinedTextField(value, { value = it }, singleLine = true, label = { Text("Shown in the greeting") }) },
+        confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save", color = Rc.Lavender) } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel", color = Rc.TextDim) } },
     )
 }

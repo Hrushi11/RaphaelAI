@@ -45,3 +45,48 @@ class OpenAILLM:
             raise ProviderError("llm", f"{e.status_code}: {e.message}", retryable=e.status_code >= 500) from e
         except openai.APIConnectionError as e:
             raise ProviderError("llm", "connection failed", retryable=True) from e
+
+    supports_tools = True
+
+    async def stream_tools(
+        self, messages: list[dict], tools: list[dict], max_tokens: int
+    ) -> AsyncIterator[tuple[str, object]]:
+        """One model step with tools. Yields ("text", delta) as it streams, then at most one
+        ("tool_calls", [{"id", "name", "arguments"}]) when the model wants to use tools.
+        `messages` are OpenAI chat messages including the system message."""
+        extra = {"reasoning_effort": self._effort} if self._effort else {}
+        calls: dict[int, dict] = {}
+        try:
+            stream = await self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                tools=tools or openai.NOT_GIVEN,
+                # One action per step, so the agent looks at the screen again before the next tap.
+                parallel_tool_calls=False if tools else openai.NOT_GIVEN,
+                max_completion_tokens=max_tokens,
+                stream=True,
+                **extra,
+            )
+            async for event in stream:
+                if not event.choices:
+                    continue
+                delta = event.choices[0].delta
+                if delta.content:
+                    yield "text", delta.content
+                for tc in delta.tool_calls or []:
+                    slot = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+                    if tc.id:
+                        slot["id"] = tc.id
+                    if tc.function and tc.function.name:
+                        slot["name"] += tc.function.name
+                    if tc.function and tc.function.arguments:
+                        slot["arguments"] += tc.function.arguments
+        except openai.RateLimitError as e:
+            raise ProviderError("llm", "rate limited", retryable=True) from e
+        except openai.APIStatusError as e:
+            raise ProviderError("llm", f"{e.status_code}: {e.message}", retryable=e.status_code >= 500) from e
+        except openai.APIConnectionError as e:
+            raise ProviderError("llm", "connection failed", retryable=True) from e
+        if calls:
+            yield "tool_calls", [calls[i] for i in sorted(calls)]
+

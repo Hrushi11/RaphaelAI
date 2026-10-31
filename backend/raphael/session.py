@@ -17,7 +17,7 @@ from fastapi import WebSocket
 from pydantic import ValidationError
 
 from . import protocol as p
-from . import wakeword
+from . import agent, wakeword
 from .chunker import SentenceChunker
 from .providers import Providers
 from .providers.base import ASRProvider, Final, Message, Partial, ProviderError, SpeechEnded
@@ -43,7 +43,7 @@ class Turn:
         self.task: asyncio.Task | None = None
 
 
-def build_system_prompt(cfg: p.AssistantConfig) -> str:
+def build_system_prompt(cfg: p.AssistantConfig, now: str | None = None) -> str:
     rules = (
         "You are speaking into the user's earpiece, so everything you write is read aloud. "
         f"Answer in at most {cfg.max_sentences} short sentences unless the user asks for more. "
@@ -56,6 +56,8 @@ def build_system_prompt(cfg: p.AssistantConfig) -> str:
     )
     if cfg.language == "hi-en":
         rules += " The user may mix Hindi and English; reply in the same natural mix."
+    if now:
+        rules += f" The current date and time is {now}."
     return f"{cfg.persona.strip()}\n\n{rules}"
 
 
@@ -132,7 +134,8 @@ class Session:
                 self.config = msg.config
                 if isinstance(msg, p.SessionStart):
                     log.info("[%s] session.start client=%s", self.id, msg.client_version)
-                    await self.send_json(p.session_ready(self.id))
+                    hub = getattr(self.providers, "hub", None)
+                    await self.send_json(p.session_ready(self.id, hub.servers if hub else []))
                 self._spawn(self._warm_tts())
                 self._spawn(self.providers.llm(self.config).warm())
             case p.TurnStart():
@@ -152,6 +155,14 @@ class Session:
                     await self._cancel_turn()
             case p.Ping():
                 await self.send_json(p.pong(msg.t))
+
+    def _now(self) -> str:
+        """Local date/time for the prompt, so "what's the time?" needs no tool."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        tz = ZoneInfo(self.settings.timezone)
+        return datetime.now(tz).strftime(f"%A %d %B %Y, %I:%M %p ({self.settings.timezone})").replace(" 0", " ")
 
     async def _warm_tts(self) -> None:
         """Open the TTS socket early so the first reply doesn't pay for it."""
@@ -353,7 +364,12 @@ class Session:
         async def llm_stage() -> None:
             chunker = SentenceChunker()
             try:
-                stream = llm.stream(build_system_prompt(cfg), messages, max_tokens=100 * cfg.max_sentences)
+                system = build_system_prompt(cfg, now=self._now())
+                hub = getattr(self.providers, "hub", None)
+                if hub is not None and hub.tools and getattr(llm, "supports_tools", False):
+                    stream = agent.run(llm, hub, system, messages, max_tokens=400)  # may use MCP tools
+                else:
+                    stream = llm.stream(system, messages, max_tokens=100 * cfg.max_sentences)
                 async for delta in stream:
                     marks.setdefault("first_token", now_ms())
                     reply.append(delta)

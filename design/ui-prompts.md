@@ -26,6 +26,7 @@ Generate the hi-fi screens with the same tool and seed if it supports one, and f
 First run:  1 Welcome → 2 Permissions → 3 Choose headset → 4 Wake word
 Every day:  5 Home idle → 6 Listening → 7 Thinking → 8 Speaking → back to 5
 Around it:  9 Paused · 10 Lock-screen notification · 11 Settings · 12 Can't connect
+Home base:  13 Dashboard (app opens here; tap the card or say "Hey Raphael" → 5)
 ```
 
 Common layout for the main screens (5–9), top to bottom:
@@ -139,6 +140,14 @@ Common layout for the main screens (5–9), top to bottom:
 **Sketch:** "[SKETCH STYLE] Same home layout. Diamond with a small crack line and an exclamation mark. Chip 'Can't reach Raphael's server'. Card with two lines of help text and an underlined link 'Server settings'. Waveform flat. Middle button contains a circular arrow, caption 'Retry'."
 
 **Hi-fi:** "[HI-FI STYLE] Home screen, connection error. Same layout, diamond dimmed with a faint amber (#FFB547) rim glow. Chip with an amber dot 'Can't reach Raphael's server'. Glass card: 'Check that your phone and computer are on the same Wi-Fi, then try again.' and a small blue link 'Server settings'. Flat waveform. Center button shows a circular retry arrow in amber-tinted blue, caption 'Retry'."
+
+### 13. Dashboard (app home: opens here every time)
+
+**Text:** greeting "Good evening, Hrushikesh" · small date/time "Sat 31 Oct · 4:32 PM" · status pill "● Listening for “Hey Raphael”" (green dot) with a round pause button at its right · earbuds row "OnePlus Nord Buds 2 · Earbuds mic" with a small chevron · hero card: diamond + "Talk to Raphael" + "Say “Hey Raphael” or tap here" · section label "CONNECTED TOOLS" · tool chips "📱 Phone ✓", "🔎 Web search ✓", "✉️ Gmail · Connect", "📅 Calendar · Connect" · footnote "🔒 Silence never leaves your phone." · top-right gear button
+
+**Sketch:** "[SKETCH STYLE] Screen: top-left handwritten greeting 'Good evening, Hrushikesh' with a smaller line 'Sat 31 Oct · 4:32 PM' under it, top-right a circle with a gear. Below, a long rounded pill with a dot and 'Listening for “Hey Raphael”' and a small circle with a pause '||' at its right end. Under it a thin row with a headphones icon 'OnePlus Nord Buds 2 · Earbuds mic >'. In the middle a large rounded card containing a diamond outline, the title 'Talk to Raphael' and the line 'Say “Hey Raphael” or tap here'. Below, a small label 'CONNECTED TOOLS' and a wrapping row of four rounded chips: 'Phone ✓', 'Web search ✓', 'Gmail · Connect', 'Calendar · Connect'. At the bottom a tiny lock icon with 'Silence never leaves your phone.'"
+
+**Hi-fi:** "[HI-FI STYLE] Dashboard home screen, calm and spacious. Top-left: 'Good evening, Hrushikesh' in large semibold off-white, with 'Sat 31 Oct · 4:32 PM' in small lavender-grey below; top-right a round dark glass button with a gear icon. Below: a wide glass pill with a glowing green dot and the text 'Listening for “Hey Raphael”', with a small round glass pause button at its right end. Under it a slim row with a headphones icon, 'OnePlus Nord Buds 2 · Earbuds mic' and a chevron, in lavender-grey. Centre: a large glass hero card with a soft violet-to-blue glowing border; inside it, the glowing glass diamond (smaller, softly breathing) above a faint light pool, the title 'Talk to Raphael' in semibold off-white and 'Say “Hey Raphael” or tap here' with 'Hey Raphael' in a violet-blue gradient. Below the card: a small uppercase lavender label 'CONNECTED TOOLS' and a wrapping row of pill chips: 'Phone' and 'Web search' with teal check marks and a subtle teal glow (connected), 'Gmail' and 'Calendar' dimmer with a small '+ Connect' in blue (not connected), each chip with a small line icon. Bottom: a small lock icon and 'Silence never leaves your phone.' in grey. No quick-action grid, no chat history."
 
 ---
 

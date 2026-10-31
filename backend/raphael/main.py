@@ -1,13 +1,17 @@
 """FastAPI app. Run from backend/:  uvicorn raphael.main:app --reload"""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket
 
+from dotenv import dotenv_values
+
+from .mcp_hub import McpHub
 from .providers import Providers
 from .session import Session
-from .settings import get_settings
+from .settings import BACKEND_DIR, get_settings
 
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -20,6 +24,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     handlers=[logging.StreamHandler(), RotatingFileHandler(_LOG_DIR / "raphael.log", maxBytes=2_000_000, backupCount=2)],
 )
+# HTTP client request logs include full URLs, and some MCP URLs carry API keys (e.g. Tavily): keep them out.
+for _noisy in ("httpx", "httpx2", "mcp"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -29,7 +36,15 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Missing in backend/.env: {', '.join(missing)} (see backend/.env.example)")
     app.state.settings = settings
     app.state.providers = Providers(settings)
-    yield
+    # MCP tools for the agent (phone control, web search, …). ${VARS} come from backend/.env + environment.
+    hub = McpHub()
+    env = {k: v for k, v in dotenv_values(BACKEND_DIR / ".env").items() if v} | dict(os.environ)
+    await hub.start(BACKEND_DIR / settings.mcp_config, env)
+    app.state.providers.hub = hub
+    try:
+        yield
+    finally:
+        await hub.close()
 
 
 app = FastAPI(title="Raphael", lifespan=lifespan)

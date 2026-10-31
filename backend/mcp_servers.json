@@ -1,0 +1,21 @@
+{
+  "_comment": "MCP servers Raphael's agent can use. ${VAR} is read from the environment / backend/.env; a server whose variables are missing is skipped. `tools` limits which tools the LLM sees (fewer = faster). Set enabled=false to switch a server off.",
+  "servers": [
+    {
+      "name": "phone",
+      "enabled": true,
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "mcp/android-mcp-server",
+      "env": {"ANDROID_SERIAL": "${ANDROID_SERIAL}"},
+      "optional_env": ["ANDROID_SERIAL"],
+      "tools": ["set_timer", "set_alarm", "device_info", "set_setting", "open_settings", "find_contact", "whatsapp_message", "sms_message", "open_app", "open_link", "read_screen", "tap", "tap_point", "type_text", "press", "swipe", "read_notifications"]
+    },
+    {
+      "name": "web",
+      "enabled": true,
+      "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_API_KEY}",
+      "tools": ["tavily_search"]
+    }
+  ]
+}

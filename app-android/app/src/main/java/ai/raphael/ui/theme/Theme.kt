@@ -58,7 +58,7 @@ val Inter = FontFamily(inter(400), inter(500), inter(600), inter(700))
  * Every font size below (and the few hard-coded ones on other screens, via [fs]) is multiplied by this.
  * Note: Android's own "Font size" setting (Settings → Display) still scales on top of this.
  */
-const val FontScale = 0.85f
+const val FontScale = 0.70f
 
 /** Scaled font size: use `fs(20)` instead of `20.sp`. */
 fun fs(size: Number) = (size.toFloat() * FontScale).sp

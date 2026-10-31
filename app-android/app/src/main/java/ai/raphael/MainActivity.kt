@@ -40,6 +40,7 @@ import ai.raphael.service.MicMode
 import ai.raphael.service.RaphaelService
 import ai.raphael.service.TurnController
 import ai.raphael.ui.ChooseHeadsetScreen
+import ai.raphael.ui.DashboardScreen
 import ai.raphael.ui.HeadsetOption
 import ai.raphael.ui.HomeScreen
 import ai.raphael.ui.MicSource
@@ -56,7 +57,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private enum class Screen { WELCOME, PERMISSIONS, HEADSET, WAKE, HOME, SETTINGS, TEST }
+// DASHBOARD = app home (mock 13, the app always opens here); HOME = the talk screen (mocks 5–9, 12).
+private enum class Screen { WELCOME, PERMISSIONS, HEADSET, WAKE, DASHBOARD, HOME, SETTINGS, TEST }
 
 /**
  * Screens from design/ui-designs-mocks: onboarding (1–4), Home (5–9, 12), Settings (11),
@@ -69,8 +71,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var wakeStore: WakeWordStore
     private val prefs by lazy { getSharedPreferences("raphael", MODE_PRIVATE) }
 
-    private val screen = mutableStateOf(Screen.HOME)
-    private var returnTo = Screen.HOME // where Headset / Wake / Test go back to
+    private val screen = mutableStateOf(Screen.DASHBOARD)
+    private var returnTo = Screen.DASHBOARD // where Headset / Wake / Test go back to
+    private var settingsReturn = Screen.DASHBOARD // where Settings goes back to
+    private val userName = mutableStateOf("")
     private var onboarding = false
     private var autoConnected = false
 
@@ -102,7 +106,7 @@ class MainActivity : ComponentActivity() {
         refresh()
         if (hasCorePermissions()) {
             permissionMessage.value = ""
-            screen.value = if (onboarding) Screen.HEADSET else Screen.HOME
+            screen.value = if (onboarding) Screen.HEADSET else Screen.DASHBOARD
         } else {
             permissionMessage.value = "Raphael can’t work without the microphone and nearby devices. Allow them to continue."
         }
@@ -128,8 +132,9 @@ class MainActivity : ComponentActivity() {
         screen.value = when {
             onboarding -> Screen.WELCOME
             !hasCorePermissions() -> Screen.PERMISSIONS
-            else -> Screen.HOME
+            else -> Screen.DASHBOARD
         }
+        userName.value = prefs.getString("name", "") ?: ""
 
         setContent { RaphaelTheme { App() } }
     }
@@ -188,7 +193,37 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            Screen.DASHBOARD -> {
+                LaunchedEffect(Unit) {
+                    // Opening the app means "I want Raphael": connect once per launch.
+                    if (!autoConnected && controller.ui.value.link == Link.DISCONNECTED) connect()
+                    autoConnected = true
+                }
+                // Say "Hey Raphael" (or tap an earbud) on the dashboard: jump to the talk screen.
+                LaunchedEffect(ui.turn) {
+                    if (ui.turn == ai.raphael.service.TurnState.LISTENING || ui.turn == ai.raphael.service.TurnState.THINKING) {
+                        screen.value = Screen.HOME
+                    }
+                }
+                DashboardScreen(
+                    ui = ui,
+                    name = userName.value,
+                    earbudsLabel = if (mode.value == MicMode.PHONE) "Phone mic · reply on earbuds"
+                    else "${headsetName.value ?: "Choose earbuds"} · Earbuds mic",
+                    onSettings = { refresh(); settingsReturn = Screen.DASHBOARD; screen.value = Screen.SETTINGS },
+                    onPause = { RaphaelService.pause(this) },
+                    onResume = { connect() },
+                    onRetry = { connect() },
+                    onEarbuds = { refresh(); returnTo = Screen.DASHBOARD; screen.value = Screen.HEADSET },
+                    onTalk = { screen.value = Screen.HOME },
+                    onConnectTool = { tool ->
+                        android.widget.Toast.makeText(this, "Connecting $tool from the app is coming soon.", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                )
+            }
+
             Screen.HOME -> {
+                BackHandler { screen.value = Screen.DASHBOARD }
                 LaunchedEffect(Unit) {
                     // Opening the app means "I want Raphael": connect once per launch.
                     if (!autoConnected && controller.ui.value.link == Link.DISCONNECTED) connect()
@@ -199,7 +234,7 @@ class MainActivity : ComponentActivity() {
                     micLevel = controller::micLevel,
                     playLevel = controller::playLevel,
                     onPill = { refresh(); returnTo = Screen.HOME; screen.value = Screen.HEADSET },
-                    onSettings = { refresh(); screen.value = Screen.SETTINGS },
+                    onSettings = { refresh(); settingsReturn = Screen.HOME; screen.value = Screen.SETTINGS },
                     onAsk = { controller.tap() },
                     onStop = { RaphaelService.stop(this) },
                     onPause = { RaphaelService.pause(this) },
@@ -209,8 +244,10 @@ class MainActivity : ComponentActivity() {
             }
 
             Screen.SETTINGS -> {
-                BackHandler { screen.value = Screen.HOME }
+                BackHandler { screen.value = settingsReturn }
                 SettingsScreen(
+                    name = userName.value,
+                    onName = { userName.value = it; prefs.edit().putString("name", it).apply() },
                     serverUrl = url.value,
                     link = ui.link,
                     headsetLabel = if (mode.value == MicMode.PHONE) "Phone mic" else headsetName.value ?: "Choose earbuds",
@@ -219,7 +256,7 @@ class MainActivity : ComponentActivity() {
                     handsFree = ui.handsFree,
                     keepRunning = batteryExempt.value,
                     version = versionName(),
-                    onBack = { screen.value = Screen.HOME },
+                    onBack = { screen.value = settingsReturn },
                     onServerUrl = {
                         url.value = it
                         prefs.edit().putString("url", it).apply()
@@ -282,7 +319,7 @@ class MainActivity : ComponentActivity() {
             onboarding = false
             prefs.edit().putBoolean("onboarded", true).apply()
             autoConnected = true // already connected during onboarding
-            screen.value = Screen.HOME
+            screen.value = Screen.DASHBOARD
         } else {
             screen.value = returnTo
         }
@@ -340,6 +377,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        // "Anytime the app is closed it should start from the dashboard": leaving from the talk
+        // screen or Settings comes back to the dashboard. (Screens that open Android pages,
+        // like Bluetooth pairing or the headset test, keep their place.)
+        if (!isChangingConfigurations && screen.value in setOf(Screen.HOME, Screen.SETTINGS)) {
+            screen.value = Screen.DASHBOARD
+        }
         deviceCallback?.let(router::unwatch)
         testJob?.cancel() // only the audio test; the session keeps running in RaphaelService
         super.onStop()

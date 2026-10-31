@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # https://play.cartesia.ai and paste an ID here.
     cartesia_voice_id: str = "a0e99841-438c-4a64-b679-ae501e7d6091"
 
+    # Agent: MCP servers (backend/mcp_servers.json) and the user's timezone for "what's the time?"
+    mcp_config: str = "mcp_servers.json"
+    timezone: str = "Asia/Kolkata"
+
     # Turn behaviour
     history_turns: int = 6  # previous Q/A pairs sent to the LLM
     no_speech_timeout_s: float = 6.0  # turn dropped if no words heard by then

@@ -81,6 +81,24 @@ say -o q.wav --data-format=LEI16@16000 "What is eighteen percent of four lakh?"
 ../venv/bin/python tools/test_client.py --wav q.wav --save-reply reply.wav
 ```
 
+## Agent tools (MCP)
+
+Raphael can call tools before answering: operate your phone, search the web. Servers are listed in
+`backend/mcp_servers.json` (add one = add an entry; `${VARS}` come from `backend/.env`).
+
+- **phone** — controls the Android phone over adb (USB or Wi-Fi debugging paired with this Mac):
+  timers, alarms, opening apps and links, reading the screen, tapping, typing, notifications.
+- **web** — Tavily search; set `TAVILY_API_KEY` in `backend/.env` (free key at tavily.com).
+
+Try the agent without voice (from `backend/`):
+
+```bash
+../venv/bin/python tools/agent_test.py "set a timer for 2 minutes"
+../venv/bin/python tools/agent_test.py "turn on dark mode"
+```
+
+The backend log shows each tool call (`tool phone__… → …`).
+
 ## Connect the phone app
 
 The phone talks to the backend over your Wi-Fi, so it needs your Mac's **local IP address**.

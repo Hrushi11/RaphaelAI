@@ -14,6 +14,11 @@ wss://<host>/v1/session?token=<token>  (when RAPHAEL_TOKEN is set on the server)
 
 A wrong token closes the socket with code `4401`.
 
+## `session.ready`
+
+`{type, session_id, tools}`: `tools` lists the MCP servers the agent can use right now
+(e.g. `["phone", "web"]`); the app's dashboard shows them as "Connected tools".
+
 ## Audio
 
 - Binary frames only carry audio: 16 kHz, mono, PCM16 little-endian, 20 ms = 640 bytes.

@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 class Providers:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.hub = None  # McpHub, set at startup (main.py) when MCP servers are configured
         if settings.llm_provider == "openai":
             self._llm = OpenAILLM(settings.llm_model, settings.openai_api_key, settings.llm_reasoning_effort)
             self._model_prefixes: tuple[str, ...] = ("gpt-", "o")

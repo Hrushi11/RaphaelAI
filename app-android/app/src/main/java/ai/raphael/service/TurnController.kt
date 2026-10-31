@@ -48,6 +48,7 @@ data class UiState(
     val paused: Boolean = false,       // user paused/stopped Raphael (mic off on purpose)
     val deviceName: String = "",       // shown in the top pill, e.g. "Nord Buds 2"
     val answeredMs: Int? = null,       // end of question → first audio, for "answered in 1.4 s"
+    val tools: List<String> = emptyList(), // MCP servers the backend's agent can use (dashboard chips)
 )
 
 /**
@@ -272,7 +273,11 @@ class TurnController(
         val forTurn = m.optString("turn_id", "")
         if (forTurn.isNotEmpty() && forTurn != turnId) return // stale turn
         when (type) {
-            "session.ready" -> _ui.update { it.copy(link = Link.READY) }
+            "session.ready" -> {
+                val list = m.optJSONArray("tools")
+                val tools = if (list == null) emptyList() else List(list.length()) { list.optString(it) }
+                _ui.update { it.copy(link = Link.READY, tools = tools) }
+            }
             "wake.detected" -> {
                 Log.i(TAG, "wake: backend confirmed wake phrase '${m.optString("phrase")}' (turn $turnId)")
                 chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
