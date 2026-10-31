@@ -1,5 +1,7 @@
 # Raphael AI
 
+![IMG](/assets/banner.png)
+
 Turns any Bluetooth headset into a voice assistant. Design: [`spec/spec.md`](spec/spec.md).
 
 ```text
