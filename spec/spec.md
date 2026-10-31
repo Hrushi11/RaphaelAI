@@ -242,7 +242,7 @@ class TTSProvider(Protocol):          # one instance per session (socket stays w
 >
 > 1. The phone runs **Silero VAD** (sherpa-onnx) on the mic. Silence never leaves the phone.
 > 2. When speech starts, the phone sends `turn.start` with `trigger: "vad"`, then ~700 ms of pre-roll and the live audio.
-> 3. The backend streams it to Deepgram (wake words added as keyterms) and checks, by sound (`backend/raphael/wakeword.py`), whether the transcript starts with a wake phrase within its first 2 words.
+> 3. The backend streams it to Deepgram (the wake phrase and its words added as keyterms: with the whole phrase as a keyterm, the developer's "Hey Raphael" went from ~half to 6/6 recognised on Oct 31) and checks, by sound (`backend/raphael/wakeword.py`), whether the transcript starts with a wake phrase within its first 2 words. The name alone also counts at the very start or after a filler word ("Raphael, …", "Okay Raphael, …"), because ASR often drops the short "hey" (Oct 31 live test: 6 of 8 attempts were heard as just "Raphael" / "Paraphael").
 >    - Yes → `wake.detected`; the phone chimes and the same turn continues as the question ("Hey Raphael, what's 18% of 4 lakh?" works in one breath; a pause after the phrase waits for the question).
 >    - No (speech ended, enough words without it, or 4 s) → `turn.dropped` with reason `no_wake`; transcript is not logged, shown or stored.
 > 4. Changing the phrase is a `config.update` (`wake.phrases`) — active immediately (S2).

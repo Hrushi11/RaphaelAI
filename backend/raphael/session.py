@@ -230,13 +230,25 @@ class Session:
             m = wakeword.match(full_text(), phrases)
             return m[1] if m else ""
 
+        def committed_question() -> str:
+            """The question from finalised segments only (no interim words)."""
+            text = " ".join(finals).strip()
+            if not gated:
+                return text
+            m = wakeword.match(text, phrases)
+            return m[1] if m else ""
+
         async def finalize() -> float:
             await asr.finalize()
             return now_ms() + s.finalize_grace_s * 1000
 
         async def drop(reason: str) -> None:
-            # No transcript in logs or messages: speech without the wake phrase is discarded.
+            # No transcript in logs or messages: speech without the wake phrase is discarded,
+            # unless DEBUG_WAKE=1 is set while debugging the wake word.
             log.info("[%s] turn %s dropped: %s", self.id, turn.id, reason)
+            if s.debug_wake and gated:
+                log.info("[%s]   DEBUG_WAKE heard %r (wake phrases %s, %.0f ms after turn start)",
+                         self.id, full_text(), phrases, now_ms() - start)
             await self.send_json(p.turn_dropped(turn.id, reason))
 
         try:
@@ -281,7 +293,9 @@ class Session:
                     if not woke:
                         await drop("no_wake")
                         return None
-                    if question():
+                    # End only once part of the question is final. A late "speech ended" for the
+                    # wake phrase can arrive while the question has only just started (interim text).
+                    if committed_question():
                         break
                     continue  # paused after "Hey Raphael": keep waiting for the question
 
@@ -294,6 +308,8 @@ class Session:
                         continue
                     woke, question_from = True, now_ms()
                     log.info("[%s] turn %s: wake phrase '%s'", self.id, turn.id, m[0])
+                    if s.debug_wake:
+                        log.info("[%s]   DEBUG_WAKE matched in %r after %.0f ms", self.id, full_text(), now_ms() - start)
                     await self.send_json(p.wake_detected(turn.id, m[0]))
                 if q := question():
                     await self.send_json(p.transcript_partial(turn.id, q))

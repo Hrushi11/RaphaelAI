@@ -84,6 +84,8 @@ class TurnController(
     @Volatile
     private var vadResetPending = true
 
+    private var lastVadSpeech = false // mic thread only; for logging transitions
+
     @Volatile
     private var waitForSilence = false // after a dropped burst, ignore the rest of that utterance
 
@@ -114,6 +116,7 @@ class TurnController(
             ui.collect { s ->
                 val armed = s.handsFree && s.link == Link.READY && s.turn == TurnState.IDLE
                 if (armed && !vadArmed) vadResetPending = true
+                if (armed != vadArmed) Log.i(TAG, "wake: hands-free listening ${if (armed) "ON" else "off"} (link=${s.link} turn=${s.turn} handsFree=${s.handsFree})")
                 vadArmed = armed
             }
         }
@@ -200,6 +203,7 @@ class TurnController(
         if (chimeNow) chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
         val frames = preroll.toList()
         preroll.clear()
+        Log.i(TAG, "turn $id start: trigger=$trigger, preroll ${frames.size * 20} ms")
         c.send(Msg.turnStart(id, trigger, frames.size * 20))
         frames.forEach(c::sendAudio)
         streamingTurn = id
@@ -211,6 +215,7 @@ class TurnController(
     }
 
     private fun onSpeechStart() {
+        Log.i(TAG, "wake: VAD heard speech (turn=${_ui.value.turn}, link=${_ui.value.link})")
         val c = client ?: return
         if (_ui.value.link == Link.READY && _ui.value.turn == TurnState.IDLE && _ui.value.handsFree) {
             startTurn(c, "vad", chimeNow = false)
@@ -234,6 +239,10 @@ class TurnController(
             vadResetPending = false
         }
         val speech = vad.accept(frame)
+        if (speech != lastVadSpeech) {
+            lastVadSpeech = speech
+            Log.i(TAG, "wake: VAD ${if (speech) "speech START" else "speech end"} (mic level ${"%.2f".format(micLevel)})")
+        }
         if (waitForSilence) {
             if (!speech) waitForSilence = false
         } else if (speech) {
@@ -265,6 +274,7 @@ class TurnController(
         when (type) {
             "session.ready" -> _ui.update { it.copy(link = Link.READY) }
             "wake.detected" -> {
+                Log.i(TAG, "wake: backend confirmed wake phrase '${m.optString("phrase")}' (turn $turnId)")
                 chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
                 val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
                 _ui.update {
@@ -291,6 +301,7 @@ class TurnController(
                 }
             }
             "turn.dropped" -> {
+                Log.i(TAG, "turn $turnId dropped by backend: ${m.optString("reason")}")
                 streamingTurn = null
                 when (val reason = m.optString("reason")) {
                     "no_wake" -> _ui.update { it.copy(ignoredBursts = it.ignoredBursts + 1) } // silent

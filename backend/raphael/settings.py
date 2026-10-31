@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     history_turns: int = 6  # previous Q/A pairs sent to the LLM
     no_speech_timeout_s: float = 6.0  # turn dropped if no words heard by then
     wake_check_s: float = 4.0  # "vad" turn dropped if no wake phrase within this time
+    # DEBUG ONLY: log what was heard in speech bursts rejected by the wake check (off by default for privacy).
+    debug_wake: bool = False
     max_turn_s: float = 30.0  # question force-ended after this long
     finalize_grace_s: float = 1.5  # wait for ASR after turn.end before giving up
 

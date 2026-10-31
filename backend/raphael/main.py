@@ -9,7 +9,17 @@ from .providers import Providers
 from .session import Session
 from .settings import get_settings
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+# Log to the terminal and to backend/logs/raphael.log (git-ignored, rotates at 2 MB).
+_LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_LOG_DIR.mkdir(exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(), RotatingFileHandler(_LOG_DIR / "raphael.log", maxBytes=2_000_000, backupCount=2)],
+)
 
 
 @asynccontextmanager

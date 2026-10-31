@@ -250,3 +250,9 @@ def test_vad_turn_without_wake_phrase_is_dropped_silently():
 def test_vad_turn_pause_after_wake_phrase_waits_for_question():
     got, _ = vad_turn([Final("hey raphael"), SpeechEnded(), Final("how far is the moon"), SpeechEnded()])
     assert next(m for m in got if m["type"] == "transcript.final")["text"] == "how far is the moon"
+
+
+def test_vad_turn_late_speech_end_does_not_cut_question():
+    # Deepgram's late "speech ended" for the wake phrase arrives while the question is still interim.
+    got, _ = vad_turn([Final("hey raphael"), Partial("what"), SpeechEnded(), Final("what is the capital of France"), SpeechEnded()])
+    assert next(m for m in got if m["type"] == "transcript.final")["text"] == "what is the capital of France"

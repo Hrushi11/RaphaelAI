@@ -31,6 +31,9 @@ class Providers:
         # Bias Deepgram toward the wake phrase words so "Raphael" isn't heard as "rifle".
         for phrase in config.wake.phrases:
             keyterms += [w for w in phrase.split() if len(w) >= 4 and w.lower() not in (k.lower() for k in keyterms)]
+            # The whole phrase too ("hey raphael"): fewer mishearings like "Here are five" / "Head of eyes".
+            if len(phrase.split()) > 1 and phrase.lower() not in (k.lower() for k in keyterms):
+                keyterms.append(phrase.lower())
         return DeepgramASR(self.settings.deepgram_api_key or "", self.settings.deepgram_model, keyterms)
 
     def llm(self, config: RaphaelConfig) -> LLMProvider:
