@@ -49,16 +49,25 @@ class RaphaelService : Service() {
     private var mode = MicMode.HEADSET
     private var headsetId: Int? = null
     private var paused = false
-    private var everReady = false
+    private var connectAttempted = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         Raphael.init(this)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Raphael listening", NotificationManager.IMPORTANCE_LOW).apply {
+        val nm = getSystemService(NotificationManager::class.java)
+        // Pixel hides "silent" (IMPORTANCE_LOW) notifications on the lock screen, so this channel is
+        // DEFAULT importance with sound and vibration switched off: visible on the lock screen, still quiet.
+        // (A channel's importance can't change after creation, hence a new id; the old one is removed.)
+        nm.deleteNotificationChannel("listening")
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Raphael listening", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Shown while Raphael can hear you"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
         )
     }
@@ -100,37 +109,56 @@ class RaphaelService : Service() {
     }
 
     private fun connectNow() {
+        connectAttempted = true
         val headset = Raphael.router.headsets().firstOrNull { it.id == headsetId } ?: Raphael.router.headsets().firstOrNull()
         controller.connect(url, mode, headset)
     }
 
-    /** Update the notification on every state change; reconnect if the link drops on its own. */
+    /**
+     * Update the notification on every state change, and retry when the connection fails or drops.
+     * Gives up after [MAX_RECONNECTS] attempts (~1 min) so a stopped backend doesn't keep the
+     * service, mic notification and wake locks running forever; the app then shows Retry / Stop.
+     */
     private fun watch() {
         if (watchJob != null) return
         watchJob = scope.launch {
             controller.ui.collect { s ->
                 notifyState()
                 if (s.link == Link.READY) {
-                    everReady = true
                     reconnectJob?.cancel()
                     reconnectJob = null
                 }
-                if (s.link == Link.DISCONNECTED && everReady && !paused && reconnectJob == null) {
+                if (s.link == Link.DISCONNECTED && connectAttempted && !paused && reconnectJob == null) {
                     reconnectJob = scope.launch {
                         var wait = 1000L
-                        while (controller.ui.value.link != Link.READY) {
+                        repeat(MAX_RECONNECTS) {
                             delay(wait)
-                            if (controller.ui.value.link == Link.DISCONNECTED) {
-                                Log.i(TAG, "reconnecting")
-                                connectNow()
+                            when (controller.ui.value.link) {
+                                Link.READY -> { reconnectJob = null; return@launch }
+                                Link.DISCONNECTED -> { Log.i(TAG, "reconnecting (${it + 1}/$MAX_RECONNECTS)"); connectNow() }
+                                Link.CONNECTING -> Unit
                             }
                             wait = (wait * 2).coerceAtMost(15_000)
                         }
+                        delay(6_000) // let the last attempt finish
                         reconnectJob = null
+                        if (controller.ui.value.link != Link.READY) giveUp()
                     }
                 }
             }
         }
+    }
+
+    /** Stop retrying and shut the service down, leaving the error visible in the app (Retry / Stop). */
+    private fun giveUp() {
+        Log.i(TAG, "giving up reconnecting")
+        paused = true // stops the watcher from scheduling more attempts
+        controller.disconnect()
+        session?.release(); session = null
+        wakeLock?.takeIf { it.isHeld }?.release(); wakeLock = null
+        wifiLock?.takeIf { it.isHeld }?.release(); wifiLock = null
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun startMediaSession() {
@@ -248,7 +276,8 @@ class RaphaelService : Service() {
 
     companion object {
         private const val TAG = "RaphaelService"
-        private const val CHANNEL = "listening"
+        private const val CHANNEL = "listening_v2"
+        private const val MAX_RECONNECTS = 8 // 1 + 2 + 4 + 8 + 15 + 15 + 15 + 15 s ≈ 75 s of retries
         private const val NOTIFICATION_ID = 1
         const val ACTION_CONNECT = "ai.raphael.CONNECT"
         const val ACTION_TAP = "ai.raphael.TAP"

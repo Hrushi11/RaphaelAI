@@ -226,7 +226,11 @@ private fun Controls(mode: HomeMode, onAsk: () -> Unit, onStop: () -> Unit, onPa
                 center = { Captioned("Resume") { GlowButton(Icons.Rounded.PlayArrow, "Resume", onResume) } },
                 right = { RoundButton(Icons.Rounded.Pause, "Paused", onResume, ring = Color(0xFF9B4DFF)) },
             )
-            HomeMode.ERROR -> Captioned("Retry") { GlowButton(Icons.Rounded.Sync, "Retry", onRetry, color = Rc.Amber) }
+            HomeMode.ERROR -> SideControls(
+                left = { RoundButton(Icons.Rounded.Close, "Stop Raphael", onStop) },
+                center = { Captioned("Retry") { GlowButton(Icons.Rounded.Sync, "Retry", onRetry, color = Rc.Amber) } },
+                right = { },
+            )
         }
     }
 }

@@ -111,8 +111,8 @@ Phone and Mac must be on the **same Wi-Fi network**.
 
 ```bash
 cd ~/raphael/app-android
-JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease
-mkdir -p dist && cp app/build/outputs/apk/release/app-release.apk dist/Raphael-v0.5.apk
+./build-apk.sh              # → dist/Raphael-v<version>.apk
+./build-apk.sh --install    # build, then install on the phone connected over adb
 ```
 
 - Signed with the release key `~/.android/raphael-release.jks`; its passwords are in
