@@ -111,14 +111,15 @@ Phone and Mac must be on the **same Wi-Fi network**.
 
 ```bash
 cd ~/raphael/app-android
-./build-apk.sh              # → dist/Raphael-v<version>.apk
-./build-apk.sh --install    # build, then install on the phone connected over adb
+./build-apk.sh --v0.5.2             # set version 0.5.2 (versionCode +1) → dist/Raphael-v0.5.2.apk
+./build-apk.sh --v0.5.2 --install   # ...and install on the phone connected over adb
+./build-apk.sh                      # rebuild the current version (asks before overwriting)
 ```
 
 - Signed with the release key `~/.android/raphael-release.jks`; its passwords are in
   `app-android/keystore.properties`. Both are git-ignored. **Back them up** — every future
   update must be signed with the same key, or phones refuse to install it.
-- Bump `versionCode` / `versionName` in `app-android/app/build.gradle.kts` for each new APK.
+- The script sets `versionName` and bumps `versionCode` in `app-android/app/build.gradle.kts` for you.
 - Installing on a phone: open the APK, allow "Install unknown apps" for the browser/Files app,
   and choose "Install anyway" if Play Protect warns (normal for apps outside the Play Store).
 - A phone that has the *debug* build (from Android Studio) must uninstall it first:
