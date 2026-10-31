@@ -15,6 +15,36 @@ app-android/    Kotlin + Compose app: hands-free wake word, earbud tap, backgrou
 > Open and build the Android project via the space-free path `~/raphael/app-android`
 > (symlink to this repo); Gradle breaks on the space in `Raphael AI`.
 
+
+## Designs
+
+<table>
+  <!-- Row 1 -->
+  <tr>
+    <td><img src="design/ui-designs-mocks/1.png" width="100%" alt="Screen 1"></td>
+    <td><img src="design/ui-designs-mocks/2.png" width="100%" alt="Screen 2"></td>
+    <td><img src="design/ui-designs-mocks/3.png" width="100%" alt="Screen 3"></td>
+  </tr>
+  <!-- Row 2 -->
+  <tr>
+    <td><img src="design/ui-designs-mocks/4.png" width="100%" alt="Screen 4"></td>
+    <td><img src="design/ui-designs-mocks/5.png" width="100%" alt="Screen 5"></td>
+    <td><img src="design/ui-designs-mocks/6.png" width="100%" alt="Screen 6"></td>
+  </tr>
+  <!-- Row 3 -->
+  <tr>
+    <td><img src="design/ui-designs-mocks/7.png" width="100%" alt="Screen 7"></td>
+    <td><img src="design/ui-designs-mocks/8.png" width="100%" alt="Screen 8"></td>
+    <td><img src="design/ui-designs-mocks/9.png" width="100%" alt="Screen 9"></td>
+  </tr>
+  <!-- Row 4 -->
+  <tr>
+    <td><img src="design/ui-designs-mocks/10.png" width="100%" alt="Screen 10"></td>
+    <td><img src="design/ui-designs-mocks/11.png" width="100%" alt="Screen 11"></td>
+    <td><img src="design/ui-designs-mocks/12.png" width="100%" alt="Screen 12"></td>
+  </tr>
+</table>
+
 ## Backend: first run
 
 ```bash
