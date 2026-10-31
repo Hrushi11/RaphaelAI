@@ -45,6 +45,9 @@ data class UiState(
     val wakePhrase: String = "",
     val wakes: List<String> = emptyList(),
     val ignoredBursts: Int = 0,
+    val paused: Boolean = false,       // user paused/stopped Raphael (mic off on purpose)
+    val deviceName: String = "",       // shown in the top pill, e.g. "Nord Buds 2"
+    val answeredMs: Int? = null,       // end of question → first audio, for "answered in 1.4 s"
 )
 
 /**
@@ -89,6 +92,23 @@ class TurnController(
     private val preroll = ArrayBlockingQueue<ByteArray>(PREROLL_FRAMES)
     private val chime = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 50)
 
+    // Live loudness for the waveform / diamond (0..1).
+    @Volatile
+    private var micLevel = 0f
+    fun micLevel(): Float = if (mic != null) micLevel else 0f
+    fun playLevel(): Float = player?.level ?: 0f
+
+    fun setPaused(paused: Boolean) = _ui.update { it.copy(paused = paused) }
+
+    /** Abandon the current turn without an answer (e.g. the wake word test). */
+    fun cancelTurn() {
+        val c = client ?: return
+        turnId?.let { c.send(Msg.turnCancel(it)) }
+        streamingTurn = null
+        player?.flush()
+        toIdle()
+    }
+
     init {
         scope.launch {
             ui.collect { s ->
@@ -109,7 +129,10 @@ class TurnController(
     fun connect(url: String, mode: MicMode, headset: AudioDeviceInfo?) {
         if (_ui.value.link != Link.DISCONNECTED) return
         this.mode = mode
-        _ui.update { it.copy(link = Link.CONNECTING, error = "", heard = "", answer = "", timings = "") }
+        val name = if (mode == MicMode.PHONE) "Phone mic" else shortName(headset?.productName?.toString())
+        _ui.update {
+            it.copy(link = Link.CONNECTING, error = "", heard = "", answer = "", timings = "", paused = false, deviceName = name)
+        }
         scope.launch {
             // 1. Audio route. Held open while connected so a trigger starts capture instantly.
             val routeLabel = if (mode == MicMode.HEADSET) {
@@ -183,7 +206,7 @@ class TurnController(
         val state = if (trigger == "vad") TurnState.CHECKING else TurnState.LISTENING
         _ui.update {
             if (state == TurnState.CHECKING) it.copy(turn = state)
-            else it.copy(turn = state, heard = "", answer = "", timings = "", error = "")
+            else it.copy(turn = state, heard = "", answer = "", timings = "", error = "", answeredMs = null)
         }
     }
 
@@ -196,6 +219,7 @@ class TurnController(
 
     // Runs on the mic thread. Nothing leaves the phone until a trigger sets streamingTurn.
     private fun onMicFrame(frame: ByteArray) {
+        micLevel = ai.raphael.audio.rms(frame)
         if (streamingTurn != null) {
             client?.sendAudio(frame)
             return
@@ -244,7 +268,7 @@ class TurnController(
                 chime.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
                 val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
                 _ui.update {
-                    it.copy(turn = TurnState.LISTENING, heard = "", answer = "", timings = "", error = "",
+                    it.copy(turn = TurnState.LISTENING, heard = "", answer = "", timings = "", error = "", answeredMs = null,
                         wakes = (listOf("$time  “${m.optString("phrase")}”") + it.wakes).take(5))
                 }
             }
@@ -256,7 +280,10 @@ class TurnController(
             "reply.text" -> _ui.update { it.copy(answer = it.answer + m.getString("delta")) }
             "reply.audio_start" -> _ui.update { it.copy(turn = TurnState.SPEAKING) }
             "reply.done" -> {
-                _ui.update { it.copy(timings = formatTimings(m.optJSONObject("timings"))) }
+                val t = m.optJSONObject("timings")
+                _ui.update {
+                    it.copy(timings = formatTimings(t), answeredMs = t?.optInt("total_ms", -1)?.takeIf { ms -> ms > 0 })
+                }
                 val id = turnId
                 scope.launch {
                     while (player?.isDrained() == false && turnId == id && _ui.value.turn == TurnState.SPEAKING) delay(50)
@@ -299,6 +326,14 @@ class TurnController(
     }
 
     companion object {
+        /** "OnePlus Nord Buds 2" → "Nord Buds 2" so it fits the top pill. */
+        fun shortName(name: String?): String {
+            val n = name?.trim().orEmpty()
+            if (n.isEmpty()) return "Earbuds"
+            val words = n.split(" ")
+            return if (n.length > 14 && words.size > 1) words.drop(1).joinToString(" ") else n
+        }
+
         private const val TAG = "RaphaelTurn"
         private const val PREROLL_FRAMES = 35
     }

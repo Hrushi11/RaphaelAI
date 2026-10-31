@@ -70,6 +70,8 @@ class RaphaelService : Service() {
                 mode = MicMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: MicMode.HEADSET.name)
                 headsetId = intent.getIntExtra(EXTRA_HEADSET, -1).takeIf { it >= 0 }
                 paused = false
+                controller.setPaused(false)
+                if (controller.ui.value.link != Link.DISCONNECTED) controller.disconnect() // new headset/mode: reconnect
                 startForeground(NOTIFICATION_ID, buildNotification(controller.ui.value), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 acquireLocks()
                 startMediaSession()
@@ -81,10 +83,12 @@ class RaphaelService : Service() {
                 paused = true
                 reconnectJob?.cancel()
                 controller.disconnect()
+                controller.setPaused(true)
                 notifyState()
             }
             ACTION_RESUME -> {
                 paused = false
+                controller.setPaused(false)
                 connectNow()
             }
             ACTION_STOP -> {
@@ -190,6 +194,7 @@ class RaphaelService : Service() {
         paused = true
         reconnectJob?.cancel()
         controller.disconnect()
+        controller.setPaused(true)
         session?.release(); session = null
         wakeLock?.takeIf { it.isHeld }?.release(); wakeLock = null
         wifiLock?.takeIf { it.isHeld }?.release(); wifiLock = null
@@ -227,6 +232,9 @@ class RaphaelService : Service() {
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // readable on the lock screen (mock 10)
+            .setColor(0xFF7C4DFF.toInt())
+            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
         if (!paused) b.addAction(0, "Ask", action(ACTION_TAP, 1))
         b.addAction(0, if (paused) "Resume" else "Pause", action(if (paused) ACTION_RESUME else ACTION_PAUSE, 2))
         b.addAction(0, "Stop", action(ACTION_STOP, 3))
@@ -260,6 +268,14 @@ class RaphaelService : Service() {
                 Intent(context, RaphaelService::class.java).setAction(ACTION_CONNECT)
                     .putExtra(EXTRA_URL, url).putExtra(EXTRA_MODE, mode.name).putExtra(EXTRA_HEADSET, headsetId ?: -1)
             )
+        }
+
+        fun pause(context: Context) {
+            context.startService(Intent(context, RaphaelService::class.java).setAction(ACTION_PAUSE))
+        }
+
+        fun resume(context: Context) {
+            context.startService(Intent(context, RaphaelService::class.java).setAction(ACTION_RESUME))
         }
 
         fun stop(context: Context) {

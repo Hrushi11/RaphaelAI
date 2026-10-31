@@ -66,6 +66,17 @@ class MicStream {
     }
 }
 
+/** RMS of a PCM16 little-endian buffer, scaled to roughly 0..1 for speech. */
+fun rms(pcm: ByteArray): Float {
+    var sum = 0.0
+    val n = pcm.size / 2
+    for (i in 0 until n) {
+        val s = ((pcm[2 * i + 1].toInt() shl 8) or (pcm[2 * i].toInt() and 0xff)).toShort().toDouble()
+        sum += s * s
+    }
+    return if (n == 0) 0f else (Math.sqrt(sum / n) / 6000.0).toFloat().coerceIn(0f, 1f)
+}
+
 /**
  * Plays reply audio as it streams in. [flush] drops everything queued (barge-in).
  */
@@ -94,12 +105,22 @@ class ReplyPlayer(usage: Int) {
 
     @Volatile
     private var framesWritten = 0L
+
+    /** Loudness (0..1) of the audio being handed to the speaker right now, for the UI. */
+    @Volatile
+    var level = 0f
+        private set
     private var playedBase = 0L
 
     private val writer = Thread({
         track.play()
         while (running) {
-            val chunk = queue.poll(100, TimeUnit.MILLISECONDS) ?: continue
+            val chunk = queue.poll(100, TimeUnit.MILLISECONDS)
+            if (chunk == null) {
+                level *= 0.5f
+                continue
+            }
+            level = rms(chunk)
             track.write(chunk, 0, chunk.size) // blocks while the buffer is full
             framesWritten += chunk.size / 2
         }
