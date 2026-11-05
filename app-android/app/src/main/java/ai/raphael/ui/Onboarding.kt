@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,14 +39,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.raphael.R
@@ -53,14 +52,14 @@ import ai.raphael.service.MicMode
 import ai.raphael.ui.theme.BackButton
 import ai.raphael.ui.theme.Diamond
 import ai.raphael.ui.theme.DiamondMood
-import ai.raphael.ui.theme.GlassCard
-import ai.raphael.ui.theme.GradientButton
-import ai.raphael.ui.theme.IconTile
+import ai.raphael.ui.theme.Panel
+import ai.raphael.ui.theme.PrimaryButton
+import ai.raphael.ui.theme.RowIcon
 import ai.raphael.ui.theme.RaphaelBackground
 import ai.raphael.ui.theme.RaphaelSwitch
 import ai.raphael.ui.theme.Rc
 import ai.raphael.ui.theme.SmallDiamond
-import ai.raphael.ui.theme.TwoToneTitle
+import ai.raphael.ui.theme.Title
 import ai.raphael.ui.theme.WaveStyle
 import ai.raphael.ui.theme.Waveform
 import ai.raphael.ui.theme.fs
@@ -95,12 +94,13 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 Diamond(DiamondMood.IDLE, { 0f }, Modifier.fillMaxWidth(0.82f))
             }
             Text("Raphael", style = MaterialTheme.typography.displayMedium.copy(fontSize = fs(64), lineHeight = fs(70)), color = Rc.Text)
-            Text("Your advisor, in your ear.", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal, fontSize = fs(26)), color = Rc.Lavender)
-            Spacer(Modifier.height(72.dp))
-            GradientButton("Get started", onStart)
-            Spacer(Modifier.height(20.dp))
-            Text("Works with any Bluetooth earbuds", style = MaterialTheme.typography.bodyMedium, color = Rc.TextDim)
-            Spacer(Modifier.height(36.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("Your advisor, in your ear", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Normal), color = Rc.Text2)
+            Spacer(Modifier.height(64.dp))
+            PrimaryButton("Get started", onStart)
+            Spacer(Modifier.height(16.dp))
+            Text("Works with any Bluetooth earbuds", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted)
+            Spacer(Modifier.height(32.dp))
         }
     }
 }
@@ -110,20 +110,20 @@ fun WelcomeScreen(onStart: () -> Unit) {
 @Composable
 fun PermissionsScreen(onAllow: () -> Unit, message: String) {
     OnboardingFrame(onBack = null) {
-        SmallDiamond(Modifier.fillMaxWidth(0.62f).height(170.dp))
+        SmallDiamond(Modifier.fillMaxWidth(0.6f).height(168.dp))
         Spacer(Modifier.height(16.dp))
-        TwoToneTitle("Raphael needs", "a few things")
-        Spacer(Modifier.height(28.dp))
+        Title("Raphael needs a few things")
+        Spacer(Modifier.height(24.dp))
         PermissionRow(Icons.Rounded.Mic, "Microphone", "to hear you")
         PermissionRow(Icons.Rounded.Headphones, "Nearby devices", "to use your earbuds")
         PermissionRow(Icons.Rounded.Notifications, "Notifications", "so you always know when Raphael can hear you")
         Spacer(Modifier.height(24.dp))
-        GradientButton("Allow", onAllow)
-        Spacer(Modifier.height(18.dp))
+        PrimaryButton("Allow", onAllow)
+        Spacer(Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Lock, null, tint = Rc.TextDim, modifier = Modifier.size(18.dp))
+            Icon(Icons.Rounded.Lock, null, tint = Rc.Muted, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Silence never leaves your phone.", style = MaterialTheme.typography.bodyMedium, color = Rc.TextDim)
+            Text("Silence never leaves your phone", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted)
         }
         if (message.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
@@ -134,13 +134,13 @@ fun PermissionsScreen(onAllow: () -> Unit, message: String) {
 
 @Composable
 private fun PermissionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) {
-    GlassCard(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-        Row(Modifier.padding(horizontal = 18.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconTile(icon, size = 64.dp)
-            Spacer(Modifier.width(20.dp))
+    Panel(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            RowIcon(icon)
+            Spacer(Modifier.width(12.dp))
             Column {
                 Text(title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text)
-                Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = Rc.Lavender)
+                Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = Rc.Text2)
             }
         }
     }
@@ -164,89 +164,83 @@ fun ChooseHeadsetScreen(
     message: String,
 ) {
     OnboardingFrame(onBack = onBack) {
-        SmallDiamond(Modifier.fillMaxWidth(0.62f).height(170.dp))
+        SmallDiamond(Modifier.fillMaxWidth(0.6f).height(168.dp))
         Spacer(Modifier.height(16.dp))
-        TwoToneTitle("Choose your", "earbuds")
+        Title("Choose your earbuds")
         Spacer(Modifier.height(24.dp))
         if (options.isEmpty()) {
             Text("No Bluetooth earbuds found. Pair them first, then come back.", style = MaterialTheme.typography.bodyMedium, color = Rc.TextDim, textAlign = TextAlign.Center)
         }
         options.forEach { o ->
             val isSel = o.name == selected
-            GlassCard(Modifier.fillMaxWidth().padding(vertical = 7.dp), highlighted = isSel, onClick = { onSelect(o) }) {
-                Row(Modifier.padding(horizontal = 18.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Panel(Modifier.fillMaxWidth().padding(vertical = 4.dp), highlighted = isSel, onClick = { onSelect(o) }) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(26.dp).clip(CircleShape).border(2.dp, if (isSel) Color(0xFFD45BFF) else Rc.TextDim, CircleShape),
+                        Modifier.size(24.dp).clip(CircleShape).border(2.dp, if (isSel) Rc.Violet else Rc.Muted, CircleShape),
                         contentAlignment = Alignment.Center,
-                    ) { if (isSel) Box(Modifier.size(13.dp).clip(CircleShape).background(Color(0xFFD45BFF))) }
+                    ) { if (isSel) Box(Modifier.size(12.dp).clip(CircleShape).background(Rc.Violet)) }
                     Spacer(Modifier.width(16.dp))
-                    IconTile(Icons.Rounded.Headphones, size = 64.dp)
-                    Spacer(Modifier.width(16.dp))
+                    RowIcon(Icons.Rounded.Headphones)
+                    Spacer(Modifier.width(12.dp))
                     Column {
                         Text(o.name, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text)
-                        Spacer(Modifier.height(6.dp))
-                        Tag(if (o.connected) "Connected" else "Paired", if (o.connected) Rc.Green else Rc.Lavender)
+                        Spacer(Modifier.height(4.dp))
+                        Tag(if (o.connected) "Connected" else "Paired", if (o.connected) Rc.Green else Rc.Muted)
                     }
                 }
             }
         }
         Row(
-            Modifier.padding(vertical = 18.dp).clickable(onClick = onPairNew),
+            Modifier.padding(vertical = 16.dp).clickable(onClick = onPairNew),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "Pair new earbuds in Bluetooth settings",
-                style = MaterialTheme.typography.bodyLarge.copy(textDecoration = TextDecoration.Underline),
-                color = Color(0xFF4DA3FF),
-            )
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Color(0xFF4DA3FF))
+            Text("Pair new earbuds in Bluetooth settings", style = MaterialTheme.typography.bodyLarge, color = Rc.Accent)
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Rc.Accent)
         }
         Text("Where should Raphael listen?", style = MaterialTheme.typography.headlineSmall, color = Rc.Text)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         Segmented(mode, onMode)
         Spacer(Modifier.height(12.dp))
         Text(
-            if (mode == MicMode.HEADSET) "Earbuds mic: phone can stay in your pocket." else "Phone mic: best audio, keep the phone near you.",
-            style = MaterialTheme.typography.bodyMedium, color = Rc.TextDim,
+            if (mode == MicMode.HEADSET) "Earbuds mic: phone can stay in your pocket" else "Phone mic: best audio, keep the phone near you",
+            style = MaterialTheme.typography.bodyMedium, color = Rc.Text2,
         )
         if (message.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(message, style = MaterialTheme.typography.bodySmall, color = Rc.Amber, textAlign = TextAlign.Center)
         }
-        Spacer(Modifier.height(22.dp))
-        GradientButton("Continue", onContinue)
+        Spacer(Modifier.height(24.dp))
+        PrimaryButton("Continue", onContinue)
     }
 }
 
 @Composable
 private fun Tag(text: String, color: Color) {
-    Row(
-        Modifier.clip(CircleShape).background(color.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Rc.Text2)
     }
 }
 
 @Composable
 private fun Segmented(mode: MicMode, onMode: (MicMode) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(60.dp).clip(CircleShape).background(Color(0x1A8C78FF)).border(1.dp, Color(0x337C4DFF), CircleShape),
+        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(12.dp)).background(Rc.Card)
+            .border(1.dp, Rc.Hairline, RoundedCornerShape(12.dp)).padding(4.dp),
     ) {
         listOf(MicMode.HEADSET to ("Earbuds mic" to Icons.Rounded.Headphones), MicMode.PHONE to ("Phone mic" to Icons.Rounded.Smartphone))
             .forEach { (m, labelIcon) ->
                 val on = m == mode
                 Row(
-                    Modifier.weight(1f).fillMaxSize().clip(CircleShape)
-                        .then(if (on) Modifier.background(Rc.Primary) else Modifier)
+                    Modifier.weight(1f).fillMaxSize().clip(RoundedCornerShape(8.dp))
+                        .then(if (on) Modifier.background(Rc.Raised).border(1.dp, Rc.HairlineStrong, RoundedCornerShape(8.dp)) else Modifier)
                         .clickable { onMode(m) },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(labelIcon.second, null, tint = if (on) Color.White else Rc.Lavender, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(labelIcon.first, style = MaterialTheme.typography.titleMedium, color = if (on) Color.White else Rc.Lavender)
+                    Icon(labelIcon.second, null, tint = if (on) Rc.Text else Rc.Muted, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(labelIcon.first, style = MaterialTheme.typography.titleMedium, color = if (on) Rc.Text else Rc.Text2)
                 }
             }
     }
@@ -269,65 +263,65 @@ fun WakeWordScreen(
     doneLabel: String = "Done",
 ) {
     OnboardingFrame(onBack = onBack) {
-        SmallDiamond(Modifier.fillMaxWidth(0.66f).height(190.dp))
+        SmallDiamond(Modifier.fillMaxWidth(0.6f).height(168.dp))
         Spacer(Modifier.height(16.dp))
-        TwoToneTitle("Your wake word", null)
+        Title("Your wake word")
         Spacer(Modifier.height(24.dp))
-        GlassCard(Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(horizontal = 24.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Panel(Modifier.fillMaxWidth(), highlighted = true) {
+            Row(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 BasicTextField(
                     value = phrase, onValueChange = onPhrase, singleLine = true,
                     textStyle = MaterialTheme.typography.headlineSmall.copy(color = Rc.Text, fontWeight = FontWeight.Normal),
                     cursorBrush = SolidColor(Rc.Violet),
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Rounded.Edit, "Edit", tint = Rc.Text, modifier = Modifier.size(26.dp))
+                Icon(Icons.Rounded.Edit, "Edit", tint = Rc.Text2, modifier = Modifier.size(24.dp))
             }
         }
-        Spacer(Modifier.height(18.dp))
-        GlassCard(Modifier.fillMaxWidth(), dashed = true) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(110.dp).height(90.dp), contentAlignment = Alignment.Center) {
+        Spacer(Modifier.height(16.dp))
+        Panel(Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(112.dp).height(88.dp), contentAlignment = Alignment.Center) {
                     Waveform(WaveStyle.BARS_VOICE, { if (tryState == TryState.HEARD) 0.15f else 0.35f }, Modifier.height(70.dp))
                     Image(painterResource(R.drawable.diamond_small), null, contentScale = ContentScale.Fit, modifier = Modifier.size(80.dp))
                 }
                 Spacer(Modifier.width(12.dp))
-                Box(Modifier.width(1.dp).height(70.dp).background(Color(0x337C4DFF)))
+                Box(Modifier.width(1.dp).height(72.dp).background(Rc.Hairline))
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text("Try it — say “${titleCase(phrase.ifBlank { "hey raphael" })}”", style = MaterialTheme.typography.titleMedium, color = Rc.Lavender)
+                    Text("Try it — say “${titleCase(phrase.ifBlank { "hey raphael" })}”", style = MaterialTheme.typography.titleMedium, color = Rc.Text)
                     Spacer(Modifier.height(8.dp))
                     when (tryState) {
                         TryState.HEARD -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.CheckCircle, null, tint = Rc.Green, modifier = Modifier.size(28.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Heard you", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Green)
+                            Icon(Icons.Rounded.CheckCircle, null, tint = Rc.Green, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Heard you", style = MaterialTheme.typography.titleMedium, color = Rc.Text)
                         }
-                        TryState.WAITING -> Text("Listening…", style = MaterialTheme.typography.titleMedium, color = Rc.Cyan)
-                        TryState.CONNECTING -> Text("Connecting to Raphael…", style = MaterialTheme.typography.bodyMedium, color = Rc.TextDim)
+                        TryState.WAITING -> Text("Listening…", style = MaterialTheme.typography.bodyMedium, color = Rc.Text2)
+                        TryState.CONNECTING -> Text("Connecting to Raphael…", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted)
                     }
                 }
             }
         }
-        Spacer(Modifier.height(22.dp))
-        GlassCard(Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconTile(Icons.Rounded.Headphones, size = 56.dp, tint = Rc.Text)
-                Spacer(Modifier.width(18.dp))
+        Spacer(Modifier.height(16.dp))
+        Panel(Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                RowIcon(Icons.Rounded.Headphones)
+                Spacer(Modifier.width(12.dp))
                 Text("Hands-free", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text, modifier = Modifier.weight(1f))
                 RaphaelSwitch(handsFree, onHandsFree)
             }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
         Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.Top) {
-            Icon(Icons.Rounded.Shield, null, tint = Rc.TextDim, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(14.dp))
+            Icon(Icons.Rounded.Shield, null, tint = Rc.Muted, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
-                "Raphael checks speech for your wake word and discards everything else.",
-                style = MaterialTheme.typography.bodyLarge, color = Rc.TextDim,
+                "Raphael checks speech for your wake word and discards everything else",
+                style = MaterialTheme.typography.bodyMedium, color = Rc.Text2,
             )
         }
-        Spacer(Modifier.height(28.dp))
-        GradientButton(doneLabel, onDone, enabled = phrase.isNotBlank())
+        Spacer(Modifier.height(24.dp))
+        PrimaryButton(doneLabel, onDone, enabled = phrase.isNotBlank())
     }
 }

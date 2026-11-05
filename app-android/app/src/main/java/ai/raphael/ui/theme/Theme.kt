@@ -9,9 +9,6 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -21,27 +18,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import ai.raphael.R
 
-/** Design tokens from design/ui-prompts.md and the mocks in design/ui-designs-mocks. */
+/**
+ * Design tokens (unslop pass, Nov 2026): quiet "ink" neutrals for every surface, one solid violet accent
+ * taken from the diamond, which stays the only colourful thing on screen. Semantic colours only carry meaning.
+ */
 object Rc {
-    val BgTop = Color(0xFF05060F)
-    val BgBottom = Color(0xFF0B0D2A)
-    val Violet = Color(0xFF7C4DFF)
-    val Magenta = Color(0xFFB04DFF)
-    val Blue = Color(0xFF3D7BFF)
-    val Cyan = Color(0xFF22C8FF)
-    val Teal = Color(0xFF2EE6D6)
-    val Amber = Color(0xFFFFB547)
-    val Green = Color(0xFF3DDC84)
-    val Text = Color(0xFFE8E9F5)
-    val TextDim = Color(0xFF9AA0C3)
-    val Lavender = Color(0xFFB9A8FF)
-    val GlassFill = Color(0x14FFFFFF)
-    val GlassFillStrong = Color(0x1F8C78FF)
-    val GlassBorder = Color(0x407C4DFF)
+    // Neutral ramp (dark, ink-tinted)
+    val Deep = Color(0xFF07080D)
+    val Page = Color(0xFF0B0D14)
+    val Card = Color(0xFF11141C)
+    val Raised = Color(0xFF1A1E28)
+    val Hairline = Color(0x14EEF0F5)        // primary text at 8 %
+    val HairlineStrong = Color(0x29EEF0F5)  // selected / focused outline
 
-    /** Violet → blue, used for primary buttons and highlighted words. */
-    val Primary = Brush.horizontalGradient(listOf(Magenta, Color(0xFF5B4BFF), Color(0xFF1FA8FF)))
-    val TextGradient = Brush.horizontalGradient(listOf(Color(0xFFC04DFF), Color(0xFF6E8BFF), Cyan))
+    // Three text roles
+    val Text = Color(0xFFEEF0F5)
+    val Text2 = Color(0xFFA3A9B8)
+    val Muted = Color(0xFF7A8296)
+
+    // One accent: the diamond's violet. Fill for controls; lighter shade for text and icons (≥ 4.5:1 on Page).
+    val Violet = Color(0xFF7C4DFF)
+    val Accent = Color(0xFFA68BFF)
+
+    // Semantic
+    val Green = Color(0xFF4CC38A)   // Raphael can hear you
+    val Amber = Color(0xFFE5A54B)   // Raphael can't hear you / problem
+
+    // Older names, mapped onto the roles above
+    val TextDim = Text2
+    val Lavender = Text2
 }
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
@@ -64,60 +69,42 @@ const val FontScale = 0.70f
 fun fs(size: Number) = (size.toFloat() * FontScale).sp
 
 private val typography = Typography(
-    displayMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(40), lineHeight = fs(46), letterSpacing = fs(-0.5)),
-    headlineLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(34), lineHeight = fs(40), letterSpacing = fs(-0.4)),
-    headlineSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(22), lineHeight = fs(28)),
-    titleLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(20), lineHeight = fs(26)),
+    displayMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(40), lineHeight = fs(46)),
+    headlineLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(34), lineHeight = fs(40)),
+    headlineSmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(22), lineHeight = fs(28)),
+    titleLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(20), lineHeight = fs(26)),
     titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(17), lineHeight = fs(22)),
     bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(18), lineHeight = fs(25)),
     bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(15), lineHeight = fs(21)),
     bodySmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = fs(13), lineHeight = fs(18)),
     labelLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(15)),
-    labelMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fs(13), letterSpacing = fs(1.2)),
+    labelMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = fs(14), lineHeight = fs(20)),
 )
 
 @Composable
 fun RaphaelTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Rc.Violet,
-            secondary = Rc.Blue,
-            tertiary = Rc.Teal,
-            background = Rc.BgTop,
-            surface = Rc.BgBottom,
-            onPrimary = Color.White,
+            primary = Rc.Accent,
+            secondary = Rc.Text2,
+            tertiary = Rc.Text2,
+            background = Rc.Page,
+            surface = Rc.Card,
+            surfaceContainerHigh = Rc.Raised,
+            onPrimary = Rc.Page,
             onBackground = Rc.Text,
             onSurface = Rc.Text,
-            onSurfaceVariant = Rc.TextDim,
+            onSurfaceVariant = Rc.Text2,
             error = Rc.Amber,
-            outline = Rc.GlassBorder,
+            outline = Rc.HairlineStrong,
         ),
         typography = typography,
         content = content,
     )
 }
 
-/** Screen background: navy gradient with soft violet / blue glows in the bottom corners (mocks 5–12). */
+/** Screen background: one flat neutral. Depth comes from surface steps and hairlines, not glows. */
 @Composable
 fun RaphaelBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Rc.BgTop, Color(0xFF070820), Rc.BgBottom)))
-            .drawBehind {
-                drawCircle(
-                    Brush.radialGradient(listOf(Color(0x557C4DFF), Color.Transparent), center = Offset(0f, size.height), radius = size.width * 0.75f),
-                    radius = size.width * 0.75f, center = Offset(0f, size.height),
-                )
-                drawCircle(
-                    Brush.radialGradient(listOf(Color(0x553D7BFF), Color.Transparent), center = Offset(size.width, size.height), radius = size.width * 0.7f),
-                    radius = size.width * 0.7f, center = Offset(size.width, size.height),
-                )
-                drawCircle(
-                    Brush.radialGradient(listOf(Color(0x223D7BFF), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * 0.8f),
-                    radius = size.width * 0.8f, center = Offset(size.width, 0f),
-                )
-            },
-        content = content,
-    )
+    Box(modifier.fillMaxSize().background(Rc.Page), content = content)
 }

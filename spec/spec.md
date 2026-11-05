@@ -93,7 +93,10 @@ A cross-platform framework (Flutter / React Native) would still need all of this
 
 **Risk reducers:** start from the sherpa-onnx Android KWS demo; use default Material components only; do the headset audio spike on day 1.
 
-**Visual design (revised Oct 31):** the app gets a custom dark look: glowing glass diamond visualizer, glass cards, waveform, three round controls. Journey, image prompts and design tokens: `design/ui-prompts.md`. Built with Compose on top of Material 3 components (colours and shapes themed, not replaced).
+**Visual design (revised Oct 31):** the app gets a custom dark look: glowing glass diamond visualizer, glass cards, waveform, three round controls. Journey, image prompts and design tokens: `design/ui-prompts.md`. Built with Compose on top of Material 3 components (colours and shapes themed, not replaced). **Unslop pass (Nov 5):** the diamond stays as the one bright element; everything else is quiet — ink-tinted
+neutral surfaces with hairlines (no glass, glows or gradients), one solid violet accent, off-white primary buttons, sentence-case
+labels, weights 400/500, and motion only where it means something (diamond follows the voice; idle screens are still). The status dot
+is the signature: green = can hear you, violet = Raphael's turn, amber = can't hear you. Tokens: `ui/theme/Theme.kt` (`Rc`).
 
 ### 3.2 Bluetooth connection
 

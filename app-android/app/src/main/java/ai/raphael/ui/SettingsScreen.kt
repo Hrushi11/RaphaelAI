@@ -40,13 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ai.raphael.service.Link
-import ai.raphael.ui.theme.GlassCard
-import ai.raphael.ui.theme.IconTile
+import ai.raphael.ui.theme.Panel
+import ai.raphael.ui.theme.RowIcon
 import ai.raphael.ui.theme.RaphaelBackground
 import ai.raphael.ui.theme.RaphaelSwitch
 import ai.raphael.ui.theme.Rc
@@ -78,12 +77,12 @@ fun SettingsScreen(
         Column(
             Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp),
         ) {
-            Row(Modifier.padding(top = 20.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Rc.Text,
                     modifier = Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onBack),
                 )
-                Spacer(Modifier.width(28.dp))
+                Spacer(Modifier.width(16.dp))
                 Text("Settings", style = MaterialTheme.typography.headlineLarge, color = Rc.Text)
             }
 
@@ -91,25 +90,25 @@ fun SettingsScreen(
             Row1(Icons.Rounded.Person, "Name", name.ifBlank { "Add your name for the greeting" }) { editingName = true }
 
             Section("Connection")
-            GlassCard(Modifier.fillMaxWidth(), onClick = { editing = true }) {
+            Panel(Modifier.fillMaxWidth(), onClick = { editing = true }) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(Icons.Rounded.Dns, size = 56.dp, tint = Rc.Text)
-                    Spacer(Modifier.width(18.dp))
+                    RowIcon(Icons.Rounded.Dns)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Server", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text)
                         Text(
-                            serverUrl.removeSuffix("/v1/session"), style = MaterialTheme.typography.bodyMedium, color = Rc.Lavender,
+                            serverUrl.removeSuffix("/v1/session"), style = MaterialTheme.typography.bodyMedium, color = Rc.Text2,
                             maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                     }
                     val (statusText, statusColor) = when (link) {
                         Link.READY -> "Connected" to Rc.Green
-                        Link.CONNECTING -> "Connecting" to Rc.Cyan
+                        Link.CONNECTING -> "Connecting" to Rc.Muted
                         Link.DISCONNECTED -> "Offline" to Rc.Amber
                     }
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor))
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(statusColor))
                     Spacer(Modifier.width(8.dp))
-                    Text(statusText, style = MaterialTheme.typography.titleMedium, color = statusColor)
+                    Text(statusText, style = MaterialTheme.typography.bodyMedium, color = Rc.Text2)
                     Chevron()
                 }
             }
@@ -118,16 +117,16 @@ fun SettingsScreen(
             Row1(Icons.Rounded.Headphones, headsetLabel, "Listen with: $listenWith", onEarbuds)
 
             Section("Wake word")
-            GlassCard(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 Column {
                     RowContent(Icons.Rounded.GraphicEq, "Wake word", wakePhrase, onWakeWord) { Chevron() }
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(1.dp).background(Color(0x267C4DFF)))
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(Rc.Hairline))
                     RowContent(Icons.Rounded.Bolt, "Hands-free", null, { onHandsFree(!handsFree) }) { RaphaelSwitch(handsFree, onHandsFree) }
                 }
             }
 
             Section("Background")
-            GlassCard(Modifier.fillMaxWidth()) {
+            Panel(Modifier.fillMaxWidth()) {
                 RowContent(Icons.Rounded.PlayCircleOutline, "Keep Raphael running", null, onKeepRunning) {
                     RaphaelSwitch(keepRunning) { onKeepRunning() }
                 }
@@ -137,8 +136,8 @@ fun SettingsScreen(
             Row1(Icons.Rounded.Hearing, "Headset audio test", null, onAudioTest)
 
             Text(
-                "Raphael v$version", style = MaterialTheme.typography.bodyLarge, color = Rc.Lavender,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
+                "Raphael v$version", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
@@ -150,29 +149,29 @@ fun SettingsScreen(
 
 @Composable
 private fun Section(title: String) = Text(
-    title.uppercase(), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-    color = Color(0xFF9B6BFF), modifier = Modifier.padding(start = 18.dp, top = 22.dp, bottom = 12.dp),
+    title, style = MaterialTheme.typography.labelMedium,
+    color = Rc.Text2, modifier = Modifier.padding(start = 4.dp, top = 24.dp, bottom = 8.dp),
 )
 
 @Composable
 private fun Chevron() {
-    Spacer(Modifier.width(10.dp))
-    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Rc.TextDim, modifier = Modifier.size(28.dp))
+    Spacer(Modifier.width(8.dp))
+    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Rc.Muted, modifier = Modifier.size(24.dp))
 }
 
 @Composable
 private fun Row1(icon: ImageVector, title: String, subtitle: String?, onClick: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth()) { RowContent(icon, title, subtitle, onClick) { Chevron() } }
+    Panel(Modifier.fillMaxWidth()) { RowContent(icon, title, subtitle, onClick) { Chevron() } }
 }
 
 @Composable
 private fun RowContent(icon: ImageVector, title: String, subtitle: String?, onClick: () -> Unit, trailing: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconTile(icon, size = 56.dp, tint = Rc.Text)
-        Spacer(Modifier.width(18.dp))
+        RowIcon(icon)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium), color = Rc.Text)
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = Rc.Lavender)
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Rc.Text2)
         }
         trailing()
     }
@@ -183,7 +182,7 @@ private fun ServerDialog(current: String, onDismiss: () -> Unit, onSave: (String
     var value by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF14163A),
+        containerColor = Rc.Raised,
         title = { Text("Server", color = Rc.Text) },
         text = {
             Column {
@@ -195,7 +194,7 @@ private fun ServerDialog(current: String, onDismiss: () -> Unit, onSave: (String
                 OutlinedTextField(value, { value = it }, singleLine = true, label = { Text("ws://<ip>:8000/v1/session") })
             }
         },
-        confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save & reconnect", color = Rc.Lavender) } },
+        confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save & reconnect", color = Rc.Accent) } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel", color = Rc.TextDim) } },
     )
 }
@@ -205,10 +204,10 @@ private fun NameDialog(current: String, onDismiss: () -> Unit, onSave: (String) 
     var value by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF14163A),
+        containerColor = Rc.Raised,
         title = { Text("Your name", color = Rc.Text) },
         text = { OutlinedTextField(value, { value = it }, singleLine = true, label = { Text("Shown in the greeting") }) },
-        confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save", color = Rc.Lavender) } },
+        confirmButton = { TextButton({ onSave(value.trim()) }) { Text("Save", color = Rc.Accent) } },
         dismissButton = { TextButton(onDismiss) { Text("Cancel", color = Rc.TextDim) } },
     )
 }

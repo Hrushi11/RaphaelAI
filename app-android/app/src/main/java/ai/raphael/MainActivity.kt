@@ -216,9 +216,6 @@ class MainActivity : ComponentActivity() {
                     onRetry = { connect() },
                     onEarbuds = { refresh(); returnTo = Screen.DASHBOARD; screen.value = Screen.HEADSET },
                     onTalk = { screen.value = Screen.HOME },
-                    onConnectTool = { tool ->
-                        android.widget.Toast.makeText(this, "Connecting $tool from the app is coming soon.", android.widget.Toast.LENGTH_SHORT).show()
-                    },
                 )
             }
 

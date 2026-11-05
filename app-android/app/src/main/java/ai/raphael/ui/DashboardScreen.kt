@@ -1,8 +1,6 @@
 package ai.raphael.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,13 +16,10 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
@@ -45,11 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -57,31 +47,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import ai.raphael.service.Link
 import ai.raphael.service.UiState
-import ai.raphael.ui.theme.GlassCard
+import ai.raphael.ui.theme.Panel
 import ai.raphael.ui.theme.RaphaelBackground
 import ai.raphael.ui.theme.Rc
 import ai.raphael.ui.theme.RoundButton
+import ai.raphael.ui.theme.RowIcon
 import ai.raphael.ui.theme.SmallDiamond
-import ai.raphael.ui.theme.fs
+import ai.raphael.ui.theme.StatusDot
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-/** Tools the dashboard knows how to show; `server` = MCP server name from session.ready. */
-private data class ToolChip(val server: String, val label: String, val icon: ImageVector)
+/** Tools the dashboard shows; `server` = MCP server name from session.ready. */
+private data class ToolRow(val server: String, val label: String, val icon: ImageVector)
 
-private val TOOL_CHIPS = listOf(
-    ToolChip("phone", "Phone", Icons.Rounded.Smartphone),
-    ToolChip("web", "Web search", Icons.Rounded.Search),
-    ToolChip("gmail", "Gmail", Icons.Rounded.Email),
-    ToolChip("calendar", "Calendar", Icons.Rounded.CalendarMonth),
+private val TOOLS = listOf(
+    ToolRow("phone", "Phone", Icons.Rounded.Smartphone),
+    ToolRow("web", "Web search", Icons.Rounded.Search),
 )
 
-/** App home (mock 13): status, earbuds, "Talk to Raphael", connected tools. */
+/** App home (mock 13, unslopped): status, earbuds, "Talk to Raphael", connected tools. */
 @Composable
 fun DashboardScreen(
     ui: UiState,
@@ -93,7 +81,6 @@ fun DashboardScreen(
     onRetry: () -> Unit,
     onEarbuds: () -> Unit,
     onTalk: () -> Unit,
-    onConnectTool: (String) -> Unit,
 ) {
     // Clock that ticks every minute for the greeting and date line.
     var now by remember { mutableStateOf(Date()) }
@@ -111,166 +98,128 @@ fun DashboardScreen(
     }
 
     RaphaelBackground {
-        WaveLines()
         Column(
             Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         ) {
-            // Greeting + settings
-            Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.Top) {
+            // Title + settings
+            Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (name.isBlank()) greeting else "$greeting,",
-                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Normal),
-                        color = Rc.Text.copy(alpha = 0.9f),
+                        if (name.isBlank()) greeting else "$greeting, $name",
+                        style = MaterialTheme.typography.headlineLarge, color = Rc.Text,
                     )
-                    if (name.isNotBlank()) Text(name, style = MaterialTheme.typography.displayMedium.copy(fontSize = fs(46)), color = Rc.Text)
                     Text(
                         SimpleDateFormat("EEE d MMM · h:mm a", Locale.getDefault()).format(now),
-                        style = MaterialTheme.typography.bodyLarge, color = Rc.Lavender, modifier = Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.bodyLarge, color = Rc.Text2, modifier = Modifier.padding(top = 4.dp),
                     )
                 }
-                RoundButton(Icons.Rounded.Settings, "Settings", onSettings, size = 52.dp)
+                RoundButton(Icons.Rounded.Settings, "Settings", onSettings, size = 48.dp)
             }
-            Spacer(Modifier.height(26.dp))
+            Spacer(Modifier.height(24.dp))
 
-            StatusPill(ui, onPause, onResume, onRetry)
-            Spacer(Modifier.height(12.dp))
+            StatusRow(ui, onPause, onResume, onRetry)
+            Spacer(Modifier.height(8.dp))
 
-            // Earbuds row
-            Row(
-                Modifier.fillMaxWidth().clip(CircleShape).background(Color(0x148C78FF))
-                    .border(1.dp, Color(0x267C4DFF), CircleShape).clickable(onClick = onEarbuds)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.Headphones, null, tint = Rc.Lavender, modifier = Modifier.size(26.dp))
-                Spacer(Modifier.width(14.dp))
-                Text(earbudsLabel, style = MaterialTheme.typography.bodyLarge, color = Rc.Text, modifier = Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Rc.Lavender)
+            // Earbuds
+            Panel(Modifier.fillMaxWidth(), radius = 12.dp, onClick = onEarbuds) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RowIcon(Icons.Rounded.Headphones)
+                    Spacer(Modifier.width(12.dp))
+                    Text(earbudsLabel, style = MaterialTheme.typography.bodyLarge, color = Rc.Text, modifier = Modifier.weight(1f))
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Rc.Muted)
+                }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Hero: Talk to Raphael
-            GlassCard(Modifier.fillMaxWidth(), highlighted = true, radius = 32.dp, onClick = onTalk) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    SmallDiamond(Modifier.fillMaxWidth(0.82f).height(190.dp))
-                    Spacer(Modifier.height(14.dp))
-                    Text("Talk to Raphael", style = MaterialTheme.typography.headlineLarge, color = Rc.Text)
-                    Spacer(Modifier.height(6.dp))
+            // Talk to Raphael: the one bright element on this screen is the diamond
+            Panel(Modifier.fillMaxWidth(), onClick = onTalk) {
+                Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    SmallDiamond(Modifier.fillMaxWidth(0.8f).height(184.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text("Talk to Raphael", style = MaterialTheme.typography.headlineSmall, color = Rc.Text)
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         buildAnnotatedString {
                             append("Say ")
-                            withStyle(SpanStyle(brush = Rc.TextGradient, fontWeight = FontWeight.SemiBold)) {
+                            withStyle(SpanStyle(color = Rc.Text, fontWeight = FontWeight.Medium)) {
                                 append("“${titleCase(ui.wakePhrase.ifBlank { "hey raphael" })}”")
                             }
                             append(" or tap here")
                         },
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal),
-                        color = Rc.Lavender, textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge, color = Rc.Text2, textAlign = TextAlign.Center,
                     )
                 }
             }
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(32.dp))
 
             // Connected tools
             Text(
-                "CONNECTED TOOLS", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9B6BFF),
-                modifier = Modifier.padding(start = 6.dp, bottom = 12.dp),
+                "Connected tools", style = MaterialTheme.typography.labelMedium, color = Rc.Text2,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
             )
-            TOOL_CHIPS.chunked(2).forEach { pair ->
-                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    pair.forEach { chip ->
-                        ToolPill(chip, connected = chip.server in ui.tools, Modifier.weight(1f)) { onConnectTool(chip.label) }
+            Panel(Modifier.fillMaxWidth()) {
+                Column {
+                    TOOLS.forEachIndexed { i, tool ->
+                        if (i > 0) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(Rc.Hairline))
+                        ToolLine(tool, connected = tool.server in ui.tools)
                     }
                 }
             }
 
             // Privacy note
             Row(
-                Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 28.dp),
+                Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 32.dp),
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.Lock, null, tint = Rc.TextDim, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Silence never leaves your phone.", style = MaterialTheme.typography.bodyLarge, color = Rc.TextDim)
+                Icon(Icons.Rounded.Lock, null, tint = Rc.Muted, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Silence never leaves your phone", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted)
             }
         }
     }
 }
 
 @Composable
-private fun StatusPill(ui: UiState, onPause: () -> Unit, onResume: () -> Unit, onRetry: () -> Unit) {
+private fun StatusRow(ui: UiState, onPause: () -> Unit, onResume: () -> Unit, onRetry: () -> Unit) {
     val mode = homeMode(ui)
     val phrase = titleCase(ui.wakePhrase.ifBlank { "hey raphael" })
     val (text, color) = when (mode) {
-        HomeMode.PAUSED -> "Paused — Raphael can’t hear you" to Rc.Lavender
+        HomeMode.PAUSED -> "Paused — Raphael can’t hear you" to Rc.Amber
         HomeMode.ERROR -> "Can’t reach Raphael’s server" to Rc.Amber
-        HomeMode.CONNECTING -> "Connecting…" to Rc.Cyan
+        HomeMode.CONNECTING -> "Connecting…" to Rc.Muted
         HomeMode.IDLE -> (if (ui.handsFree) "Listening for “$phrase”" else "Ready — tap to talk") to Rc.Green
-        else -> "Raphael is busy…" to Rc.Cyan
+        else -> "Answering" to Rc.Accent
     }
-    val (icon, action) = when (mode) {
-        HomeMode.PAUSED -> Icons.Rounded.PlayArrow to onResume
-        HomeMode.ERROR -> Icons.Rounded.Sync to onRetry
-        else -> Icons.Rounded.Pause to onPause
+    val (icon, action, label) = when (mode) {
+        HomeMode.PAUSED -> Triple(Icons.Rounded.PlayArrow, onResume, "Resume listening")
+        HomeMode.ERROR -> Triple(Icons.Rounded.Sync, onRetry, "Retry")
+        else -> Triple(Icons.Rounded.Pause, onPause, "Pause listening")
     }
-    Row(
-        Modifier.fillMaxWidth().clip(CircleShape)
-            .background(Brush.horizontalGradient(listOf(Color(0x332E7D5B).takeIf { mode == HomeMode.IDLE } ?: Color(0x1A8C78FF), Color(0x1A8C78FF))))
-            .border(1.dp, Brush.horizontalGradient(listOf(color.copy(alpha = 0.45f), Color(0x557C4DFF))), CircleShape)
-            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(14.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(14.dp))
-        Text(text, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal), color = Rc.Text, modifier = Modifier.weight(1f))
-        Box(
-            Modifier.size(48.dp).clip(CircleShape).background(Color(0x297C4DFF))
-                .border(1.5.dp, Color(0x997C4DFF), CircleShape).clickable(onClick = action),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = Rc.Text, modifier = Modifier.size(24.dp)) }
-    }
-}
-
-@Composable
-private fun ToolPill(chip: ToolChip, connected: Boolean, modifier: Modifier, onConnect: () -> Unit) {
-    val shape = RoundedCornerShape(40.dp)
-    Row(
-        modifier.clip(shape)
-            .background(if (connected) Color(0x1A2EE6D6) else Color(0x128C78FF))
-            .border(1.dp, if (connected) Rc.Teal.copy(alpha = 0.6f) else Color(0x337C4DFF), shape)
-            .then(if (connected) Modifier else Modifier.clickable(onClick = onConnect))
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(chip.icon, null, tint = Rc.Text, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.width(12.dp))
-        Text(chip.label, style = MaterialTheme.typography.titleMedium, color = Rc.Text, modifier = Modifier.weight(1f), maxLines = 1)
-        if (connected) Icon(Icons.Rounded.Check, "Connected", tint = Rc.Green, modifier = Modifier.size(24.dp))
-        else Text("+ Connect", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4DA3FF))
-    }
-}
-
-/** Faint flowing lines across the background, as in mock 13. */
-@Composable
-private fun WaveLines() {
-    Canvas(Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-        fun wave(y0: Float, amp: Float, alpha: Float, color: Color) {
-            val path = Path().apply {
-                moveTo(-20f, y0)
-                cubicTo(w * 0.3f, y0 - amp, w * 0.6f, y0 + amp, w + 20f, y0 - amp * 0.6f)
-            }
-            drawPath(path, color.copy(alpha = alpha), style = Stroke(1.5.dp.toPx()))
+    Panel(Modifier.fillMaxWidth(), radius = 12.dp) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            StatusDot(color, hollow = mode == HomeMode.PAUSED)
+            Spacer(Modifier.width(12.dp))
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = Rc.Text, modifier = Modifier.weight(1f))
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(Rc.Raised).clickable(onClick = action),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, label, tint = Rc.Text2, modifier = Modifier.size(20.dp)) }
         }
-        wave(h * 0.52f, h * 0.06f, 0.35f, Rc.Blue)
-        wave(h * 0.56f, h * 0.05f, 0.18f, Rc.Violet)
-        wave(h * 0.90f, h * 0.05f, 0.40f, Rc.Blue)
-        wave(h * 0.93f, h * 0.04f, 0.20f, Rc.Cyan)
-        drawCircle(
-            Brush.radialGradient(listOf(Color(0x333D7BFF), Color.Transparent), center = Offset(w, h * 0.2f), radius = w * 0.6f),
-            radius = w * 0.6f, center = Offset(w, h * 0.2f),
-        )
+    }
+}
+
+@Composable
+private fun ToolLine(tool: ToolRow, connected: Boolean) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        RowIcon(tool.icon)
+        Spacer(Modifier.width(12.dp))
+        Text(tool.label, style = MaterialTheme.typography.bodyLarge, color = Rc.Text, modifier = Modifier.weight(1f), maxLines = 1)
+        if (connected) {
+            Icon(Icons.Rounded.Check, null, tint = Rc.Green, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Connected", style = MaterialTheme.typography.bodyMedium, color = Rc.Text2)
+        } else {
+            Text("Not connected", style = MaterialTheme.typography.bodyMedium, color = Rc.Muted)
+        }
     }
 }
